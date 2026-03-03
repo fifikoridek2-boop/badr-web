@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:badr/core/constants/app_constants.dart';
 import 'package:badr/features/home/home_provider.dart';
+import 'package:badr/features/prayer/prayer_provider.dart';
 import 'package:badr/features/library/library_screen.dart';
 import 'package:badr/features/tasbih/tasbih_screen.dart';
 import 'package:badr/features/radio/radio_screen.dart';
@@ -19,13 +21,20 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     final provider = context.read<HomeProvider>();
-    Future.microtask(() => provider.loadData());
+    final prayerProvider = context.read<PrayerProvider>();
+    Future.microtask(() async {
+      await Future.wait([
+        provider.loadData(),
+        prayerProvider.loadPrayerTimes(),
+      ]);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
     final provider = context.watch<HomeProvider>();
+    final prayerProvider = context.watch<PrayerProvider>();
 
     return Scaffold(
       backgroundColor: color.surface,
@@ -48,15 +57,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => provider.loadData(),
+        onRefresh: () async {
+          await Future.wait([
+            provider.loadData(),
+            context.read<PrayerProvider>().loadPrayerTimes(),
+          ]);
+        },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              provider.isLoading
+              (provider.isLoading || prayerProvider.isLoading)
                   ? _ShimmerCard(height: 100)
-                  : _PrayerCard(provider: provider),
+                  : const _PrayerCard(),
               const SizedBox(height: 16),
               provider.isLoading
                   ? _ShimmerCard(height: 120)
@@ -112,13 +126,15 @@ class _ShimmerCard extends StatelessWidget {
 //  بطاقة وقت الصلاة
 // ═══════════════════════════════════════
 class _PrayerCard extends StatelessWidget {
-  final HomeProvider provider;
-  const _PrayerCard({required this.provider});
+  const _PrayerCard();
 
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
-    final prayer = provider.prayerTimes;
+    final prayerProvider = context.watch<PrayerProvider>();
+
+    final nextPrayer = prayerProvider.getNextPrayer();
+    final nextTime = prayerProvider.getNextPrayerTime();
 
     return Card(
       elevation: 0,
@@ -138,7 +154,7 @@ class _PrayerCard extends StatelessWidget {
                         size: 20, color: color.onPrimaryContainer),
                     const SizedBox(width: 6),
                     Text(
-                      prayer?.getNextPrayer() ?? '---',
+                      nextPrayer.isNotEmpty ? nextPrayer : '---',
                       style: TextStyle(
                         fontFamily: AppConstants.fontCairo,
                         fontSize: 20,
@@ -155,7 +171,7 @@ class _PrayerCard extends StatelessWidget {
                         size: 16, color: color.onPrimaryContainer),
                     const SizedBox(width: 6),
                     Text(
-                      prayer?.getNextPrayerTime() ?? '--:--',
+                      nextTime != null ? DateFormat('hh:mm a').format(nextTime) : '--:--',
                       style: TextStyle(
                         fontFamily: AppConstants.fontCairo,
                         fontSize: 16,
@@ -172,7 +188,7 @@ class _PrayerCard extends StatelessWidget {
                         color: color.onPrimaryContainer.withValues(alpha: 0.7)),
                     const SizedBox(width: 6),
                     Text(
-                      prayer?.getTimeRemaining() ?? '',
+                      _timeRemainingText(nextTime),
                       style: TextStyle(
                         fontFamily: AppConstants.fontCairo,
                         fontSize: 13,
@@ -188,6 +204,18 @@ class _PrayerCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _timeRemainingText(DateTime? nextTime) {
+    if (nextTime == null) return '';
+    final diff = nextTime.difference(DateTime.now());
+    if (diff.isNegative) return '';
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes % 60;
+    if (hours > 0) {
+      return 'بعد $hours س $minutes د';
+    }
+    return 'بعد $minutes دقيقة';
   }
 }
 
