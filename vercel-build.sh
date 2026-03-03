@@ -6,8 +6,9 @@ FLUTTER_CHANNEL="${FLUTTER_CHANNEL:-stable}"
 FLUTTER_ARCHIVE="flutter_linux_${FLUTTER_VERSION}-${FLUTTER_CHANNEL}.tar.xz"
 FLUTTER_URL="https://storage.googleapis.com/flutter_infra_release/releases/${FLUTTER_CHANNEL}/linux/${FLUTTER_ARCHIVE}"
 FLUTTER_HOME="$PWD/.flutter-sdk"
+FLUTTER_BIN="$FLUTTER_HOME/bin/flutter"
 
-if [ ! -x "$FLUTTER_HOME/flutter/bin/flutter" ]; then
+if [ ! -x "$FLUTTER_BIN" ]; then
   echo "Downloading Flutter SDK ${FLUTTER_VERSION} (${FLUTTER_CHANNEL})..."
   rm -rf "$FLUTTER_HOME"
   mkdir -p "$FLUTTER_HOME"
@@ -15,7 +16,7 @@ if [ ! -x "$FLUTTER_HOME/flutter/bin/flutter" ]; then
   tar -xJf /tmp/flutter.tar.xz -C "$FLUTTER_HOME" --strip-components=1
 fi
 
-export PATH="$FLUTTER_HOME/flutter/bin:$PATH"
+export PATH="$FLUTTER_HOME/bin:$PATH"
 
 flutter --version
 flutter config --no-analytics
