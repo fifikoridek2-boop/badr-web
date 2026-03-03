@@ -1,13 +1,17 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:quran_library/quran_library.dart' as qlib;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:badr/core/services/api_service.dart';
-import 'package:badr/shared/models/surah_model.dart';
+
 import 'package:badr/shared/models/ayah_model.dart';
 import 'package:badr/shared/models/quran_page_model.dart';
+import 'package:badr/shared/models/surah_model.dart';
 
 class QuranProvider extends ChangeNotifier {
-  final ApiService _api = ApiService();
+  final qlib.QuranLibrary _quran = qlib.QuranLibrary();
+
+  static bool _isQuranInitialized = false;
 
   List<SurahModel> _surahs = [];
   List<AyahModel> _ayahs = [];
@@ -39,19 +43,33 @@ class QuranProvider extends ChangeNotifier {
     _loadBookmarks();
   }
 
+  Future<void> _ensureQuranInitialized() async {
+    if (_isQuranInitialized) return;
+    await qlib.QuranLibrary.init();
+    _isQuranInitialized = true;
+  }
+
   Future<void> loadSurahs() async {
     if (_surahs.isNotEmpty) return;
     _isLoadingSurahs = true;
     _error = '';
     notifyListeners();
     try {
-      final data = await _api.getSurahs();
-      if (data is List) {
-        _surahs = data
-            .map((e) => SurahModel.fromJson(e as Map<String, dynamic>))
-            .toList();
-        _filteredSurahs = List.from(_surahs);
-      }
+      await _ensureQuranInitialized();
+
+      _surahs = List.generate(114, (index) {
+        final surahNumber = index + 1;
+        final info = _quran.getSurahInfo(surahNumber: surahNumber);
+        return SurahModel(
+          id: surahNumber,
+          number: surahNumber,
+          arName: info.name,
+          nameEn: info.englishName,
+          type: info.revelationType,
+          ayatCount: info.ayahsNumber,
+        );
+      });
+      _filteredSurahs = List.from(_surahs);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -67,8 +85,30 @@ class QuranProvider extends ChangeNotifier {
     _error = '';
     notifyListeners();
     try {
-      final data = await _api.getQuranPageText(pageNumber);
-      _currentPage = QuranPageModel.fromJson(data as Map<String, dynamic>);
+      await _ensureQuranInitialized();
+
+      final pageAyahs = _quran.getPageAyahsByPageNumber(pageNumber: pageNumber);
+      final surah = _quran.getCurrentSurahDataByPageNumber(pageNumber: pageNumber);
+      final juz = _quran.getJuzByPageNumber(pageNumber: pageNumber);
+
+      final ayahs = pageAyahs
+          .map(
+            (a) => PageAyahModel(
+              ayahNumber: a.ayahNumber,
+              text: a.text,
+              juzNumber: a.juz,
+              sajda: a.sajda != null && a.sajda != false,
+            ),
+          )
+          .toList();
+
+      _currentPage = QuranPageModel(
+        pageNumber: pageNumber,
+        surahNameAr: surah.arabicName,
+        surahNumber: surah.surahNumber,
+        juzNumber: juz.juz,
+        ayahs: ayahs,
+      );
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -84,12 +124,32 @@ class QuranProvider extends ChangeNotifier {
     _error = '';
     notifyListeners();
     try {
-      final data = await _api.getAyahs(surahNumber);
-      if (data is List) {
-        _ayahs = data
-            .map((e) => AyahModel.fromJson(e as Map<String, dynamic>))
-            .toList();
+      await _ensureQuranInitialized();
+
+      final startPage = getSurahStartPage(surahNumber);
+      final nextStart = surahNumber < 114 ? getSurahStartPage(surahNumber + 1) : 605;
+      final endPage = nextStart - 1;
+
+      final result = <AyahModel>[];
+      for (int p = startPage; p <= endPage; p++) {
+        final pageAyahs = _quran.getPageAyahsByPageNumber(pageNumber: p);
+        for (final a in pageAyahs) {
+          if (a.surahNumber == surahNumber) {
+            result.add(
+              AyahModel(
+                id: a.ayahUQNumber,
+                surahId: a.surahNumber ?? surahNumber,
+                ayahNumber: a.ayahNumber,
+                text: a.text,
+                juzNumber: a.juz,
+                hizbNumber: a.hizb ?? 0,
+                sajda: a.sajda != null && a.sajda != false,
+              ),
+            );
+          }
+        }
       }
+      _ayahs = result;
     } catch (e) {
       _error = e.toString();
     } finally {

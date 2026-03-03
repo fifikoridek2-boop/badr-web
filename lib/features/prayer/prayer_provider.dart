@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:adhan/adhan.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:just_audio/just_audio.dart';
+import 'dart:async';
 import 'dart:convert';
+
+import 'package:adhan/adhan.dart';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PrayerProvider extends ChangeNotifier {
   PrayerTimes? _prayerTimes;
@@ -15,6 +17,9 @@ class PrayerProvider extends ChangeNotifier {
   // إعدادات
   CalculationMethod _method = CalculationMethod.umm_al_qura;
   Madhab _madhab = Madhab.shafi;
+  bool _isAutoMethod = true;
+  bool _isAutoMadhab = true;
+
   Map<String, bool> _notifications = {
     'fajr': true,
     'sunrise': false,
@@ -39,25 +44,33 @@ class PrayerProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   CalculationMethod get method => _method;
   Madhab get madhab => _madhab;
+  bool get isAutoMethod => _isAutoMethod;
+  bool get isAutoMadhab => _isAutoMadhab;
   Map<String, bool> get notifications => _notifications;
   Map<String, int> get adjustments => _adjustments;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
+  Stream<Duration> get adhanPositionStream => _audioPlayer.positionStream;
+  Stream<Duration?> get adhanDurationStream => _audioPlayer.durationStream;
+  Stream<PlayerState> get adhanPlayerStateStream => _audioPlayer.playerStateStream;
+  bool get isAdhanPlaying => _audioPlayer.playing;
+  Duration? get adhanDuration => _audioPlayer.duration;
+
+  late final StreamSubscription<PlayerState> _playerStateSub;
 
   PrayerProvider() {
+    _playerStateSub = _audioPlayer.playerStateStream.listen((_) {
+      notifyListeners();
+    });
     _loadSettings();
   }
 
-  // ═══════════════════════════════════════
-  //  تحميل المواقيت
-  // ═══════════════════════════════════════
   Future<void> loadPrayerTimes() async {
     _isLoading = true;
     _error = '';
     notifyListeners();
 
     try {
-      // طلب الصلاحية
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -69,26 +82,21 @@ class PrayerProvider extends ChangeNotifier {
         return;
       }
 
-      // الموقع
       _position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.low,
         ),
       );
 
-      // حفظ الإحداثيات
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('lat', _position!.latitude);
       await prefs.setDouble('lng', _position!.longitude);
 
-      // حساب المواقيت
       _calculateTimes();
 
-      // اسم المدينة من الإحداثيات
-      _cityName = '${_position!.latitude.toStringAsFixed(2)}° , ${_position!.longitude.toStringAsFixed(2)}°';
-
+      _cityName =
+          '${_position!.latitude.toStringAsFixed(2)}° , ${_position!.longitude.toStringAsFixed(2)}°';
     } catch (e) {
-      // محاولة تحميل الإحداثيات المحفوظة
       final prefs = await SharedPreferences.getInstance();
       final lat = prefs.getDouble('lat');
       final lng = prefs.getDouble('lng');
@@ -119,17 +127,47 @@ class PrayerProvider extends ChangeNotifier {
   void _calculateTimes() {
     if (_position == null) return;
     final coordinates = Coordinates(_position!.latitude, _position!.longitude);
-    final params = _method.getParameters();
-    params.madhab = _madhab;
-
-    // تطبيق التعديلات
-
+    final resolvedMethod = _resolveCalculationMethod();
+    final resolvedMadhab = _resolveMadhab();
+    final params = resolvedMethod.getParameters();
+    params.madhab = resolvedMadhab;
     _prayerTimes = PrayerTimes.today(coordinates, params);
   }
 
-  // ═══════════════════════════════════════
-  //  الأوقات كـ List
-  // ═══════════════════════════════════════
+  CalculationMethod _resolveCalculationMethod() {
+    if (!_isAutoMethod || _position == null) return _method;
+    final lat = _position!.latitude;
+    final lng = _position!.longitude;
+
+    if (lng >= 34 && lng <= 60 && lat >= 12 && lat <= 40) {
+      return CalculationMethod.umm_al_qura;
+    }
+    if (lng >= 60 && lng <= 95 && lat >= 5 && lat <= 42) {
+      return CalculationMethod.karachi;
+    }
+    if (lng >= -30 && lng <= 55 && lat >= 10 && lat <= 37) {
+      return CalculationMethod.egyptian;
+    }
+    if (lng >= -12 && lng <= 45 && lat >= 37) {
+      return CalculationMethod.turkey;
+    }
+    if (lng <= -30) {
+      return CalculationMethod.north_america;
+    }
+    return CalculationMethod.muslim_world_league;
+  }
+
+  Madhab _resolveMadhab() {
+    if (!_isAutoMadhab || _position == null) return _madhab;
+    final lat = _position!.latitude;
+    final lng = _position!.longitude;
+
+    if (lng >= 60 && lng <= 95 && lat >= 5 && lat <= 42) {
+      return Madhab.hanafi;
+    }
+    return Madhab.shafi;
+  }
+
   List<Map<String, dynamic>> getPrayerList() {
     if (_prayerTimes == null) return [];
     return [
@@ -172,18 +210,24 @@ class PrayerProvider extends ChangeNotifier {
     ];
   }
 
-  // الصلاة الحالية أو القادمة
   String getCurrentPrayer() {
     if (_prayerTimes == null) return '';
     final current = _prayerTimes!.currentPrayer();
     switch (current) {
-      case Prayer.fajr: return 'الفجر';
-      case Prayer.sunrise: return 'الشروق';
-      case Prayer.dhuhr: return 'الظهر';
-      case Prayer.asr: return 'العصر';
-      case Prayer.maghrib: return 'المغرب';
-      case Prayer.isha: return 'العشاء';
-      default: return '';
+      case Prayer.fajr:
+        return 'الفجر';
+      case Prayer.sunrise:
+        return 'الشروق';
+      case Prayer.dhuhr:
+        return 'الظهر';
+      case Prayer.asr:
+        return 'العصر';
+      case Prayer.maghrib:
+        return 'المغرب';
+      case Prayer.isha:
+        return 'العشاء';
+      default:
+        return '';
     }
   }
 
@@ -191,13 +235,20 @@ class PrayerProvider extends ChangeNotifier {
     if (_prayerTimes == null) return '';
     final next = _prayerTimes!.nextPrayer();
     switch (next) {
-      case Prayer.fajr: return 'الفجر';
-      case Prayer.sunrise: return 'الشروق';
-      case Prayer.dhuhr: return 'الظهر';
-      case Prayer.asr: return 'العصر';
-      case Prayer.maghrib: return 'المغرب';
-      case Prayer.isha: return 'العشاء';
-      default: return '';
+      case Prayer.fajr:
+        return 'الفجر';
+      case Prayer.sunrise:
+        return 'الشروق';
+      case Prayer.dhuhr:
+        return 'الظهر';
+      case Prayer.asr:
+        return 'العصر';
+      case Prayer.maghrib:
+        return 'المغرب';
+      case Prayer.isha:
+        return 'العشاء';
+      default:
+        return '';
     }
   }
 
@@ -207,11 +258,16 @@ class PrayerProvider extends ChangeNotifier {
     return _prayerTimes!.timeForPrayer(next);
   }
 
-  // ═══════════════════════════════════════
-  //  الإعدادات
-  // ═══════════════════════════════════════
   void setMethod(CalculationMethod method) {
     _method = method;
+    _isAutoMethod = false;
+    _calculateTimes();
+    _saveSettings();
+    notifyListeners();
+  }
+
+  void setMethodAuto(bool value) {
+    _isAutoMethod = value;
     _calculateTimes();
     _saveSettings();
     notifyListeners();
@@ -219,6 +275,14 @@ class PrayerProvider extends ChangeNotifier {
 
   void setMadhab(Madhab madhab) {
     _madhab = madhab;
+    _isAutoMadhab = false;
+    _calculateTimes();
+    _saveSettings();
+    notifyListeners();
+  }
+
+  void setMadhabAuto(bool value) {
+    _isAutoMadhab = value;
     _calculateTimes();
     _saveSettings();
     notifyListeners();
@@ -236,27 +300,35 @@ class PrayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════
-  //  تشغيل الأذان
-  // ═══════════════════════════════════════
   Future<void> playAdhan() async {
     try {
-      await _audioPlayer.setAsset('assets/audio/adan.mp3');
+      final currentAsset = _audioPlayer.audioSource != null;
+      if (!currentAsset) {
+        await _audioPlayer.setAsset('assets/audio/adan.mp3');
+      }
       await _audioPlayer.play();
     } catch (_) {}
   }
 
-  Future<void> stopAdhan() async {
-    await _audioPlayer.stop();
+  Future<void> pauseAdhan() async {
+    await _audioPlayer.pause();
   }
 
-  // ═══════════════════════════════════════
-  //  حفظ وتحميل الإعدادات
-  // ═══════════════════════════════════════
+  Future<void> stopAdhan() async {
+    await _audioPlayer.stop();
+    await _audioPlayer.seek(Duration.zero);
+  }
+
+  Future<void> seekAdhan(Duration position) async {
+    await _audioPlayer.seek(position);
+  }
+
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('prayer_method', _method.index);
     await prefs.setInt('prayer_madhab', _madhab.index);
+    await prefs.setBool('prayer_method_auto', _isAutoMethod);
+    await prefs.setBool('prayer_madhab_auto', _isAutoMadhab);
     await prefs.setString('prayer_notifications', jsonEncode(_notifications));
     await prefs.setString('prayer_adjustments', jsonEncode(_adjustments));
   }
@@ -265,14 +337,22 @@ class PrayerProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final methodIndex = prefs.getInt('prayer_method');
     final madhabIndex = prefs.getInt('prayer_madhab');
+    final methodAuto = prefs.getBool('prayer_method_auto');
+    final madhabAuto = prefs.getBool('prayer_madhab_auto');
     final notifData = prefs.getString('prayer_notifications');
     final adjData = prefs.getString('prayer_adjustments');
 
-    if (methodIndex != null) {
+    if (methodIndex != null && methodIndex < CalculationMethod.values.length) {
       _method = CalculationMethod.values[methodIndex];
     }
-    if (madhabIndex != null) {
+    if (madhabIndex != null && madhabIndex < Madhab.values.length) {
       _madhab = Madhab.values[madhabIndex];
+    }
+    if (methodAuto != null) {
+      _isAutoMethod = methodAuto;
+    }
+    if (madhabAuto != null) {
+      _isAutoMadhab = madhabAuto;
     }
     if (notifData != null) {
       _notifications = Map<String, bool>.from(jsonDecode(notifData));
@@ -298,6 +378,7 @@ class PrayerProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _playerStateSub.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }

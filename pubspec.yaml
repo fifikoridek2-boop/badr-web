@@ -53,6 +53,7 @@ dependencies:
   adhan: ^2.0.0+1
   geolocator: ^14.0.2
   intl: ^0.20.2
+  quran_library: ^3.1.0
 
 dev_dependencies:
   flutter_test:

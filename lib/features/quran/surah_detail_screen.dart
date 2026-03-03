@@ -241,9 +241,9 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.wifi_off, size: 48, color: color.error),
+          Icon(Icons.error_outline, size: 48, color: color.error),
           const SizedBox(height: 12),
-          Text('لا يوجد اتصال بالإنترنت',
+          Text('تعذر تحميل بيانات الصفحة',
               style: TextStyle(
                   fontFamily: AppConstants.fontCairo, color: color.error)),
           const SizedBox(height: 12),
