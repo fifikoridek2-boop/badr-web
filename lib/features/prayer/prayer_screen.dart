@@ -100,6 +100,13 @@ class _PrayerScreenState extends State<PrayerScreen> {
     final currentPrayer = provider.getCurrentPrayer();
     final nextPrayer = provider.getNextPrayer();
     final nextTime = provider.getNextPrayerTime();
+    DateTime? currentTime;
+    for (final p in prayers) {
+      if (p['name'] == currentPrayer) {
+        currentTime = p['time'] as DateTime?;
+        break;
+      }
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -135,70 +142,30 @@ class _PrayerScreenState extends State<PrayerScreen> {
           color: color.primaryContainer,
           child: Row(
             children: [
-              if (currentPrayer.isNotEmpty)
-                Expanded(
-                  child: Column(
-                    children: [
-                      Text(
-                        'الصلاة الحالية',
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          fontSize: 12,
-                          color: color.onPrimaryContainer.withValues(alpha: 0.75),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        currentPrayer,
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: color.onPrimaryContainer,
-                        ),
-                      ),
-                    ],
-                  ),
+              Expanded(
+                child: _PrayerSummaryPane(
+                  title: 'الصلاة الحالية',
+                  name: currentPrayer.isNotEmpty ? currentPrayer : '--',
+                  timeText: currentTime != null
+                      ? DateFormat('hh:mm a').format(currentTime!)
+                      : '--:--',
+                  color: color,
                 ),
-              if (currentPrayer.isNotEmpty && nextPrayer.isNotEmpty)
-                Container(
-                  width: 1,
-                  height: 56,
-                  color: color.onPrimaryContainer.withValues(alpha: 0.3),
+              ),
+              Container(
+                width: 1,
+                height: 64,
+                color: color.onPrimaryContainer.withValues(alpha: 0.3),
+              ),
+              Expanded(
+                child: _PrayerSummaryPane(
+                  title: 'الصلاة القادمة',
+                  name: nextPrayer.isNotEmpty ? nextPrayer : '--',
+                  timeText:
+                      nextTime != null ? DateFormat('hh:mm a').format(nextTime) : '--:--',
+                  color: color,
                 ),
-              if (nextPrayer.isNotEmpty && nextTime != null)
-                Expanded(
-                  child: Column(
-                    children: [
-                      Text(
-                        'الصلاة القادمة',
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          fontSize: 12,
-                          color: color.onPrimaryContainer.withValues(alpha: 0.75),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        nextPrayer,
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: color.onPrimaryContainer,
-                        ),
-                      ),
-                      Text(
-                        DateFormat('hh:mm a').format(nextTime),
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          fontSize: 13,
-                          color: color.onPrimaryContainer.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              ),
             ],
           ),
         ),
@@ -218,83 +185,64 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              _SettingRow(
+              _SettingLabel(
                 label: 'طريقة الحساب',
                 tooltip:
                     'اختر تلقائي ليتم تحديد طريقة الحساب حسب إحداثيات موقعك، أو اختر طريقة محددة يدويًا.',
                 color: color,
-                child: DropdownButton<CalculationMethod?>(
-                  value: provider.isAutoMethod ? null : provider.method,
-                  isDense: true,
-                  dropdownColor: color.surfaceContainerHigh,
-                  style: TextStyle(
-                    fontFamily: AppConstants.fontCairo,
-                    fontSize: 12,
-                    color: color.onSurface,
-                  ),
-                  underline: const SizedBox(),
-                  items: [
-                    DropdownMenuItem<CalculationMethod?>(
-                      value: null,
-                      child: Text(
-                        'تلقائي',
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          color: color.onSurface,
-                        ),
-                      ),
-                    ),
-                    ...PrayerProvider.methodNames.entries.map(
-                      (e) => DropdownMenuItem<CalculationMethod?>(
-                        value: e.key,
-                        child: Text(
-                          e.value,
-                          style: TextStyle(
-                            fontFamily: AppConstants.fontCairo,
-                            color: color.onSurface,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  onChanged: (v) {
-                    if (v == null) {
-                      provider.setMethodAuto(true);
-                    } else {
-                      provider.setMethod(v);
-                    }
-                  },
-                ),
               ),
-              const SizedBox(height: 10),
-              _SettingRow(
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _SmallChip(
+                    label: 'تلقائي',
+                    selected: provider.isAutoMethod,
+                    color: color,
+                    onTap: () => provider.setMethodAuto(true),
+                  ),
+                  ...PrayerProvider.methodNames.entries.map(
+                    (e) => _SmallChip(
+                      label: e.value,
+                      selected: !provider.isAutoMethod && provider.method == e.key,
+                      color: color,
+                      onTap: () => provider.setMethod(e.key),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _SettingLabel(
                 label: 'حساب العصر',
                 tooltip:
                     'اختر تلقائي ليتم تحديد المذهب حسب موقعك، أو حدده يدويًا (شافعي/حنفي).',
                 color: color,
-                child: Wrap(
-                  spacing: 6,
-                  children: [
-                    _SmallChip(
-                      label: 'تلقائي',
-                      selected: provider.isAutoMadhab,
-                      color: color,
-                      onTap: () => provider.setMadhabAuto(true),
-                    ),
-                    _SmallChip(
-                      label: 'شافعي',
-                      selected: !provider.isAutoMadhab && provider.madhab == Madhab.shafi,
-                      color: color,
-                      onTap: () => provider.setMadhab(Madhab.shafi),
-                    ),
-                    _SmallChip(
-                      label: 'حنفي',
-                      selected: !provider.isAutoMadhab && provider.madhab == Madhab.hanafi,
-                      color: color,
-                      onTap: () => provider.setMadhab(Madhab.hanafi),
-                    ),
-                  ],
-                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _SmallChip(
+                    label: 'تلقائي',
+                    selected: provider.isAutoMadhab,
+                    color: color,
+                    onTap: () => provider.setMadhabAuto(true),
+                  ),
+                  _SmallChip(
+                    label: 'شافعي',
+                    selected: !provider.isAutoMadhab && provider.madhab == Madhab.shafi,
+                    color: color,
+                    onTap: () => provider.setMadhab(Madhab.shafi),
+                  ),
+                  _SmallChip(
+                    label: 'حنفي',
+                    selected: !provider.isAutoMadhab && provider.madhab == Madhab.hanafi,
+                    color: color,
+                    onTap: () => provider.setMadhab(Madhab.hanafi),
+                  ),
+                ],
               ),
             ],
           ),
@@ -404,6 +352,55 @@ class _PrayerScreenState extends State<PrayerScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class _PrayerSummaryPane extends StatelessWidget {
+  final String title;
+  final String name;
+  final String timeText;
+  final ColorScheme color;
+
+  const _PrayerSummaryPane({
+    required this.title,
+    required this.name,
+    required this.timeText,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontFamily: AppConstants.fontCairo,
+            fontSize: 12,
+            color: color.onPrimaryContainer.withValues(alpha: 0.75),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          name,
+          style: TextStyle(
+            fontFamily: AppConstants.fontCairo,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color.onPrimaryContainer,
+          ),
+        ),
+        Text(
+          timeText,
+          style: TextStyle(
+            fontFamily: AppConstants.fontCairo,
+            fontSize: 13,
+            color: color.onPrimaryContainer.withValues(alpha: 0.8),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -550,48 +547,37 @@ class _AdhanControlCard extends StatelessWidget {
   }
 }
 
-class _SettingRow extends StatelessWidget {
+class _SettingLabel extends StatelessWidget {
   final String label;
   final String tooltip;
   final ColorScheme color;
-  final Widget child;
 
-  const _SettingRow({
+  const _SettingLabel({
     required this.label,
     required this.tooltip,
     required this.color,
-    required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Tooltip(
-            message: tooltip,
-            triggerMode: TooltipTriggerMode.tap,
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      fontSize: 12,
-                      color: color.onSurface.withValues(alpha: 0.85),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(Icons.info_outline, size: 14, color: color.onSurfaceVariant),
-              ],
+    return Tooltip(
+      message: tooltip,
+      triggerMode: TooltipTriggerMode.tap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: AppConstants.fontCairo,
+              fontSize: 12,
+              color: color.onSurface.withValues(alpha: 0.85),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        child,
-      ],
+          const SizedBox(width: 4),
+          Icon(Icons.info_outline, size: 14, color: color.onSurfaceVariant),
+        ],
+      ),
     );
   }
 }

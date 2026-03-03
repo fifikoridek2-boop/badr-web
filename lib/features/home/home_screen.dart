@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:badr/core/constants/app_constants.dart';
-import 'package:badr/features/prayer/prayer_screen.dart';
 import 'package:badr/features/home/home_provider.dart';
 import 'package:badr/features/library/library_screen.dart';
 import 'package:badr/features/tasbih/tasbih_screen.dart';
@@ -42,11 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.access_alarm_outlined),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrayerScreen())),
-            tooltip: 'مواقيت الصلاة',
-          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {},

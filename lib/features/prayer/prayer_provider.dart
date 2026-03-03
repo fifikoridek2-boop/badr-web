@@ -316,6 +316,7 @@ class PrayerProvider extends ChangeNotifier {
 
   Future<void> stopAdhan() async {
     await _audioPlayer.stop();
+    await _audioPlayer.seek(Duration.zero);
   }
 
   Future<void> seekAdhan(Duration position) async {
