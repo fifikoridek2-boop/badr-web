@@ -40,8 +40,8 @@ dependencies:
   # ═══════════════════════════════
   #  الصوت والتلاوة
   # ═══════════════════════════════
-  just_audio: ^0.9.42
-  just_audio_background: ^0.0.1-beta.11
+  just_audio: ^0.10.5
+  just_audio_background: ^0.0.1-beta.17
   audio_session: ^0.1.21
 
   # ═══════════════════════════════
