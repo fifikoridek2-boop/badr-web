@@ -1,16 +1,34 @@
-# myapp
+# بدر (Flutter)
 
-A new Flutter project.
+تطبيق Flutter للقرآن والأذكار.
 
-## Getting Started
+## تشغيل محلي
+```bash
+flutter pub get
+flutter run
+```
 
-This project is a starting point for a Flutter application.
+## بناء نسخة ويب
+```bash
+flutter pub get
+flutter build web --release
+```
 
-A few resources to get you started if this is your first Flutter project:
+## نشر على Vercel (بدون التأثير على APK)
+تمت إضافة إعدادات مخصصة ليتولى Vercel تثبيت Flutter ثم بناء نسخة الويب:
+- `vercel.json`
+- `vercel-build.sh`
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### إعدادات مشروع Vercel
+1. ادخل مشروعك في Vercel.
+2. **Framework Preset** = `Other`.
+3. اترك Build Command من `vercel.json` (أو اجعله: `bash ./vercel-build.sh`).
+4. Output Directory = `build/web`.
+5. أعد النشر Redeploy.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### متغيرات اختيارية
+يمكنك تحديد نسخة Flutter عبر متغير بيئة في Vercel:
+- `FLUTTER_VERSION` (افتراضي: `3.24.5`)
+- `FLUTTER_CHANNEL` (افتراضي: `stable`)
+
+> ملاحظة: هذه الإعدادات تخص الويب فقط ولا تعدّل ملفات `android/` أو توقيع APK.
