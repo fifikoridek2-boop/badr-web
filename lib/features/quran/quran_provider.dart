@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:badr/shared/models/ayah_model.dart';
 import 'package:badr/shared/models/quran_page_model.dart';
 import 'package:badr/shared/models/surah_model.dart';
+import 'package:badr/features/quran/local_surah_data.dart';
 
 class QuranProvider extends ChangeNotifier {
   final qlib.QuranLibrary _quran = qlib.QuranLibrary();
@@ -65,13 +66,15 @@ class QuranProvider extends ChangeNotifier {
           number: surahNumber,
           arName: info.name,
           nameEn: info.englishName,
-          type: info.revelationType,
+          type: _normalizeRevelationType(info.revelationType),
           ayatCount: info.ayahsNumber,
         );
       });
       _filteredSurahs = List.from(_surahs);
     } catch (e) {
-      _error = e.toString();
+      _surahs = _buildFallbackSurahs();
+      _filteredSurahs = List.from(_surahs);
+      _error = '';
     } finally {
       _isLoadingSurahs = false;
       notifyListeners();
@@ -257,4 +260,26 @@ class QuranProvider extends ChangeNotifier {
     }
     return 604;
   }
+
+  String _normalizeRevelationType(String type) {
+    final t = type.trim();
+    if (t == 'Meccan' || t == 'Medinan') return t;
+    if (t.contains('مك')) return 'Meccan';
+    if (t.contains('مد')) return 'Medinan';
+    return 'Meccan';
+  }
+
+  List<SurahModel> _buildFallbackSurahs() {
+    return kLocalSurahData.map((e) {
+      return SurahModel(
+        id: e['number'] as int,
+        number: e['number'] as int,
+        arName: e['arName'] as String,
+        nameEn: e['nameEn'] as String,
+        type: e['type'] as String,
+        ayatCount: e['ayatCount'] as int,
+      );
+    }).toList();
+  }
+
 }

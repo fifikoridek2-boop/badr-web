@@ -231,10 +231,10 @@ class _SurahListScreenState extends State<SurahListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.wifi_off, size: 48, color: color.error),
+          Icon(Icons.error_outline, size: 48, color: color.error),
           const SizedBox(height: 12),
           Text(
-            'لا يوجد اتصال بالإنترنت',
+            'تعذر تحميل قائمة السور',
             style: TextStyle(
               fontFamily: AppConstants.fontCairo,
               color: color.error,
