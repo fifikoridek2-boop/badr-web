@@ -18,7 +18,7 @@ dependencies:
   #  الشبكة والـ API
   # ═══════════════════════════════
   dio: ^5.7.0
-  connectivity_plus: ^6.1.4
+  connectivity_plus: ^7.0.0
 
   # ═══════════════════════════════
   #  State Management
@@ -40,8 +40,8 @@ dependencies:
   # ═══════════════════════════════
   #  الصوت والتلاوة
   # ═══════════════════════════════
-  just_audio: ^0.9.42
-  just_audio_background: ^0.0.1-beta.11
+  just_audio: ^0.10.5
+  just_audio_background: ^0.0.1-beta.17
   audio_session: ^0.1.21
 
   # ═══════════════════════════════
@@ -53,6 +53,7 @@ dependencies:
   adhan: ^2.0.0+1
   geolocator: ^14.0.2
   intl: ^0.20.2
+  quran_library: ^3.1.0
 
 dev_dependencies:
   flutter_test:
