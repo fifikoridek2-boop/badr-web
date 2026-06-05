@@ -178,12 +178,30 @@ class _SurahListScreenState extends State<SurahListScreen> {
           //  القائمة
           // ═══════════════════════════════════════
           Expanded(
-            child: provider.isLoadingSurahs
+            child: provider.isLoadingSurahs && surahs.isEmpty
                 ? _buildShimmer(color)
-                : provider.error.isNotEmpty
-                    ? _buildError(context, provider, color)
-                    : surahs.isEmpty
-                        ? Center(
+                : surahs.isNotEmpty
+                    ? ListView.builder(
+                        itemCount: surahs.length,
+                        itemBuilder: (context, index) {
+                          final surah = surahs[index];
+                          return _SurahTile(
+                            surah: surah,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SurahDetailScreen(
+                                  surahNumber: surah.number,
+                                  surahName: surah.arName,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : provider.error.isNotEmpty
+                        ? _buildError(context, provider, color)
+                        : Center(
                             child: Text(
                               'لا توجد نتائج',
                               style: TextStyle(
@@ -191,24 +209,6 @@ class _SurahListScreenState extends State<SurahListScreen> {
                                 color: color.onSurfaceVariant,
                               ),
                             ),
-                          )
-                        : ListView.builder(
-                            itemCount: surahs.length,
-                            itemBuilder: (context, index) {
-                              final surah = surahs[index];
-                              return _SurahTile(
-                                surah: surah,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => SurahDetailScreen(
-                                      surahNumber: surah.number,
-                                      surahName: surah.arName,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
                           ),
           ),
         ],
@@ -231,10 +231,10 @@ class _SurahListScreenState extends State<SurahListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.wifi_off, size: 48, color: color.error),
+          Icon(Icons.error_outline, size: 48, color: color.error),
           const SizedBox(height: 12),
           Text(
-            'لا يوجد اتصال بالإنترنت',
+            'تعذر تحميل قائمة السور',
             style: TextStyle(
               fontFamily: AppConstants.fontCairo,
               color: color.error,

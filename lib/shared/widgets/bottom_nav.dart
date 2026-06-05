@@ -5,6 +5,7 @@ import 'package:badr/features/home/home_screen.dart';
 import 'package:badr/features/quran/quran_screen.dart';
 import 'package:badr/features/azkar/azkar_screen.dart';
 import 'package:badr/features/library/library_screen.dart';
+import 'package:badr/features/prayer/prayer_screen.dart';
 import 'package:badr/features/settings/settings_screen.dart';
 import 'package:badr/features/library/library_provider.dart';
 
@@ -23,6 +24,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     const QuranScreen(),
     const AzkarScreen(),
     const LibraryScreen(),
+    const PrayerScreen(),
     const SettingsScreen(),
   ];
 
@@ -74,6 +76,11 @@ class _MainScaffoldState extends State<MainScaffold> {
                 icon: Icon(Icons.headphones_outlined),
                 selectedIcon: Icon(Icons.headphones),
                 label: 'المكتبة',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.access_time_outlined),
+                selectedIcon: Icon(Icons.access_time_filled),
+                label: 'الصلاة',
               ),
               NavigationDestination(
                 icon: Icon(Icons.settings_outlined),

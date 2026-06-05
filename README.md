@@ -28,7 +28,7 @@ flutter build web --release
 
 ### متغيرات اختيارية
 يمكنك تحديد نسخة Flutter عبر متغير بيئة في Vercel:
-- `FLUTTER_VERSION` (افتراضي: `3.24.5`)
+- `FLUTTER_VERSION` (افتراضي: `3.41.3`)
 - `FLUTTER_CHANNEL` (افتراضي: `stable`)
 
 > ملاحظة: هذه الإعدادات تخص الويب فقط ولا تعدّل ملفات `android/` أو توقيع APK.
