@@ -76,7 +76,7 @@ class QuranProvider extends ChangeNotifier {
         return SurahModel(
           id: surahNumber,
           number: surahNumber,
-          arName: info.name,
+          arName: _plainSurahName(surahNumber),
           nameEn: info.englishName,
           type: _normalizeRevelationType(info.revelationType),
           ayatCount: info.ayahsNumber,
@@ -274,6 +274,13 @@ class QuranProvider extends ChangeNotifier {
       return pages[surahNumber - 1];
     }
     return 604;
+  }
+
+  String _plainSurahName(int surahNumber) {
+    if (surahNumber < 1 || surahNumber > kPlainSurahNames.length) {
+      return '';
+    }
+    return kPlainSurahNames[surahNumber - 1];
   }
 
   String _normalizeRevelationType(String type) {
