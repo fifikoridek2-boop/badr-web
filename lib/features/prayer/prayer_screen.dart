@@ -192,27 +192,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 color: color,
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  _SmallChip(
-                    label: 'تلقائي',
-                    selected: provider.isAutoMethod,
-                    color: color,
-                    onTap: () => provider.setMethodAuto(true),
-                  ),
-                  ...PrayerProvider.methodNames.entries.map(
-                    (e) => _SmallChip(
-                      label: e.value,
-                      selected: !provider.isAutoMethod && provider.method == e.key,
-                      color: color,
-                      onTap: () => provider.setMethod(e.key),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+              _CalculationMethodDropdown(provider: provider),
+              const SizedBox(height: 16),
               _SettingLabel(
                 label: 'حساب العصر',
                 tooltip:
@@ -220,30 +201,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 color: color,
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  _SmallChip(
-                    label: 'تلقائي',
-                    selected: provider.isAutoMadhab,
-                    color: color,
-                    onTap: () => provider.setMadhabAuto(true),
-                  ),
-                  _SmallChip(
-                    label: 'شافعي',
-                    selected: !provider.isAutoMadhab && provider.madhab == Madhab.shafi,
-                    color: color,
-                    onTap: () => provider.setMadhab(Madhab.shafi),
-                  ),
-                  _SmallChip(
-                    label: 'حنفي',
-                    selected: !provider.isAutoMadhab && provider.madhab == Madhab.hanafi,
-                    color: color,
-                    onTap: () => provider.setMadhab(Madhab.hanafi),
-                  ),
-                ],
-              ),
+              _AsrMadhabSegmentedButton(provider: provider),
             ],
           ),
         ),
@@ -433,109 +391,165 @@ class _AdhanControlCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    return _SectionCard(
+    return Card.filled(
+      elevation: 0,
       color: color.surfaceContainerLow,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'تشغيل الأذان',
-            style: TextStyle(
-              fontFamily: AppConstants.fontCairo,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color.primary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          StreamBuilder<Duration?>(
-            stream: provider.adhanDurationStream,
-            builder: (context, durationSnap) {
-              final duration = durationSnap.data ?? provider.adhanDuration ?? Duration.zero;
-              return StreamBuilder<Duration>(
-                stream: provider.adhanPositionStream,
-                builder: (context, posSnap) {
-                  final position = posSnap.data ?? Duration.zero;
-                  final maxMs = duration.inMilliseconds <= 0 ? 1 : duration.inMilliseconds;
-                  final value = position.inMilliseconds.clamp(0, maxMs).toDouble();
-
-                  return Column(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.volume_up_outlined,
+                    color: color.onPrimaryContainer,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Slider(
-                        value: value,
-                        min: 0,
-                        max: maxMs.toDouble(),
-                        onChanged: (v) {
-                          provider.seekAdhan(Duration(milliseconds: v.round()));
-                        },
+                      Text(
+                        'معاينة الأذان',
+                        style: TextStyle(
+                          fontFamily: AppConstants.fontCairo,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: color.onSurface,
+                        ),
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _formatDuration(position),
-                            style: TextStyle(
-                              fontFamily: AppConstants.fontCairo,
-                              fontSize: 12,
-                              color: color.onSurfaceVariant,
+                      Text(
+                        'استمع للأذان قبل تفعيل التنبيهات',
+                        style: textTheme.labelSmall?.copyWith(
+                          fontFamily: AppConstants.fontCairo,
+                          color: color.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            StreamBuilder<Duration?>(
+              stream: provider.adhanDurationStream,
+              builder: (context, durationSnap) {
+                final duration =
+                    durationSnap.data ?? provider.adhanDuration ?? Duration.zero;
+                return StreamBuilder<Duration>(
+                  stream: provider.adhanPositionStream,
+                  builder: (context, posSnap) {
+                    final position = posSnap.data ?? Duration.zero;
+                    final maxMs = duration.inMilliseconds <= 0
+                        ? 1
+                        : duration.inMilliseconds;
+                    final value =
+                        position.inMilliseconds.clamp(0, maxMs).toDouble();
+                    final remaining = duration > position
+                        ? duration - position
+                        : Duration.zero;
+
+                    return Column(
+                      children: [
+                        SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 4,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 7,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 14,
                             ),
                           ),
-                          Text(
-                            _formatDuration(duration),
-                            style: TextStyle(
-                              fontFamily: AppConstants.fontCairo,
-                              fontSize: 12,
-                              color: color.onSurfaceVariant,
-                            ),
+                          child: Slider(
+                            value: value,
+                            min: 0,
+                            max: maxMs.toDouble(),
+                            onChanged: (v) {
+                              provider.seekAdhan(
+                                Duration(milliseconds: v.round()),
+                              );
+                            },
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      StreamBuilder<PlayerState>(
-                        stream: provider.adhanPlayerStateStream,
-                        builder: (context, snap) {
-                          final isPlaying = snap.data?.playing ?? provider.isAdhanPlaying;
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              FilledButton.icon(
-                                onPressed: () => provider.playAdhan(),
-                                icon: const Icon(Icons.play_arrow),
-                                label: Text(
-                                  'تشغيل',
-                                  style: TextStyle(fontFamily: AppConstants.fontCairo),
+                              Text(
+                                _formatDuration(position),
+                                style: textTheme.labelSmall?.copyWith(
+                                  fontFamily: AppConstants.fontCairo,
+                                  color: color.onSurfaceVariant,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              OutlinedButton.icon(
-                                onPressed: isPlaying ? () => provider.pauseAdhan() : null,
-                                icon: const Icon(Icons.pause),
-                                label: Text(
-                                  'إيقاف مؤقت',
-                                  style: TextStyle(fontFamily: AppConstants.fontCairo),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              OutlinedButton.icon(
-                                onPressed: () => provider.stopAdhan(),
-                                icon: const Icon(Icons.stop),
-                                label: Text(
-                                  'إيقاف',
-                                  style: TextStyle(fontFamily: AppConstants.fontCairo),
+                              Text(
+                                '-${_formatDuration(remaining)}',
+                                style: textTheme.labelSmall?.copyWith(
+                                  fontFamily: AppConstants.fontCairo,
+                                  color: color.onSurfaceVariant,
                                 ),
                               ),
                             ],
-                          );
-                        },
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-        ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        StreamBuilder<PlayerState>(
+                          stream: provider.adhanPlayerStateStream,
+                          builder: (context, snap) {
+                            final isPlaying =
+                                snap.data?.playing ?? provider.isAdhanPlaying;
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                IconButton.filled(
+                                  onPressed: () => isPlaying
+                                      ? provider.pauseAdhan()
+                                      : provider.playAdhan(),
+                                  icon: Icon(
+                                    isPlaying ? Icons.pause : Icons.play_arrow,
+                                    size: 30,
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: color.primary,
+                                    foregroundColor: color.onPrimary,
+                                    fixedSize: const Size.square(58),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                IconButton.filledTonal(
+                                  onPressed: () => provider.stopAdhan(),
+                                  icon: const Icon(Icons.stop, size: 22),
+                                  style: IconButton.styleFrom(
+                                    fixedSize: const Size.square(44),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -544,6 +558,121 @@ class _AdhanControlCard extends StatelessWidget {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+}
+
+class _CalculationMethodDropdown extends StatelessWidget {
+  final PrayerProvider provider;
+
+  const _CalculationMethodDropdown({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme;
+    final currentValue = provider.isAutoMethod ? 'auto' : provider.method.name;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return DropdownMenu<String>(
+          key: ValueKey(currentValue),
+          width: constraints.maxWidth,
+          initialSelection: currentValue,
+          menuStyle: MenuStyle(
+            backgroundColor: WidgetStateProperty.all(
+              color.surfaceContainerHigh,
+            ),
+          ),
+          textStyle: TextStyle(
+            fontFamily: AppConstants.fontCairo,
+            color: color.onSurface,
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: color.surfaceContainerHigh,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: color.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: color.outlineVariant),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+          ),
+          dropdownMenuEntries: [
+            DropdownMenuEntry<String>(
+              value: 'auto',
+              label: 'تلقائي',
+              leadingIcon: Icon(Icons.auto_mode, color: color.primary),
+            ),
+            ...PrayerProvider.methodNames.entries.map(
+              (e) => DropdownMenuEntry<String>(
+                value: e.key.name,
+                label: e.value,
+              ),
+            ),
+          ],
+          onSelected: (value) {
+            if (value == null) return;
+            if (value == 'auto') {
+              provider.setMethodAuto(true);
+              return;
+            }
+            final method = PrayerProvider.methodNames.keys.firstWhere(
+              (m) => m.name == value,
+              orElse: () => provider.method,
+            );
+            provider.setMethod(method);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _AsrMadhabSegmentedButton extends StatelessWidget {
+  final PrayerProvider provider;
+
+  const _AsrMadhabSegmentedButton({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = provider.isAutoMadhab
+        ? 'auto'
+        : provider.madhab == Madhab.hanafi
+            ? 'hanafi'
+            : 'shafi';
+
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<String>(
+        selected: {selected},
+        showSelectedIcon: false,
+        segments: const [
+          ButtonSegment(value: 'auto', label: Text('تلقائي')),
+          ButtonSegment(value: 'shafi', label: Text('شافعي')),
+          ButtonSegment(value: 'hanafi', label: Text('حنفي')),
+        ],
+        onSelectionChanged: (values) {
+          final value = values.first;
+          if (value == 'auto') {
+            provider.setMadhabAuto(true);
+          } else if (value == 'hanafi') {
+            provider.setMadhab(Madhab.hanafi);
+          } else {
+            provider.setMadhab(Madhab.shafi);
+          }
+        },
+        style: ButtonStyle(
+          textStyle: WidgetStateProperty.all(
+            TextStyle(fontFamily: AppConstants.fontCairo),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -577,46 +706,6 @@ class _SettingLabel extends StatelessWidget {
           const SizedBox(width: 4),
           Icon(Icons.info_outline, size: 14, color: color.onSurfaceVariant),
         ],
-      ),
-    );
-  }
-}
-
-class _SmallChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final ColorScheme color;
-  final VoidCallback onTap;
-
-  const _SmallChip({
-    required this.label,
-    required this.selected,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? color.primary : color.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? color.primary : color.outlineVariant,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: AppConstants.fontCairo,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: selected ? color.onPrimary : color.onSurface,
-          ),
-        ),
       ),
     );
   }
