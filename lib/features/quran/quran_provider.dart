@@ -51,14 +51,26 @@ class QuranProvider extends ChangeNotifier {
   }
 
   Future<void> loadSurahs() async {
-    if (_surahs.isNotEmpty) return;
+    if (_surahs.isNotEmpty) {
+      _error = '';
+      _filteredSurahs = List.from(_surahs);
+      notifyListeners();
+      return;
+    }
+
     _isLoadingSurahs = true;
     _error = '';
+
+    // اعرض قائمة السور فوراً من بيانات محلية مضمّنة حتى تعمل الشاشة بدون إنترنت
+    // وبدون انتظار تهيئة quran_library أو أي خدمة داخلية فيها.
+    _surahs = _buildFallbackSurahs();
+    _filteredSurahs = List.from(_surahs);
     notifyListeners();
+
     try {
       await _ensureQuranInitialized();
 
-      _surahs = List.generate(114, (index) {
+      final librarySurahs = List.generate(114, (index) {
         final surahNumber = index + 1;
         final info = _quran.getSurahInfo(surahNumber: surahNumber);
         return SurahModel(
@@ -70,10 +82,13 @@ class QuranProvider extends ChangeNotifier {
           ayatCount: info.ayahsNumber,
         );
       });
-      _filteredSurahs = List.from(_surahs);
-    } catch (e) {
-      _surahs = _buildFallbackSurahs();
-      _filteredSurahs = List.from(_surahs);
+
+      if (librarySurahs.length == 114) {
+        _surahs = librarySurahs;
+        _filteredSurahs = List.from(_surahs);
+      }
+    } catch (_) {
+      // نبقي البيانات المحلية ظاهرة ولا نعرض خطأ إنترنت لقائمة السور.
       _error = '';
     } finally {
       _isLoadingSurahs = false;

@@ -178,12 +178,30 @@ class _SurahListScreenState extends State<SurahListScreen> {
           //  القائمة
           // ═══════════════════════════════════════
           Expanded(
-            child: provider.isLoadingSurahs
+            child: provider.isLoadingSurahs && surahs.isEmpty
                 ? _buildShimmer(color)
-                : provider.error.isNotEmpty
-                    ? _buildError(context, provider, color)
-                    : surahs.isEmpty
-                        ? Center(
+                : surahs.isNotEmpty
+                    ? ListView.builder(
+                        itemCount: surahs.length,
+                        itemBuilder: (context, index) {
+                          final surah = surahs[index];
+                          return _SurahTile(
+                            surah: surah,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SurahDetailScreen(
+                                  surahNumber: surah.number,
+                                  surahName: surah.arName,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : provider.error.isNotEmpty
+                        ? _buildError(context, provider, color)
+                        : Center(
                             child: Text(
                               'لا توجد نتائج',
                               style: TextStyle(
@@ -191,24 +209,6 @@ class _SurahListScreenState extends State<SurahListScreen> {
                                 color: color.onSurfaceVariant,
                               ),
                             ),
-                          )
-                        : ListView.builder(
-                            itemCount: surahs.length,
-                            itemBuilder: (context, index) {
-                              final surah = surahs[index];
-                              return _SurahTile(
-                                surah: surah,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => SurahDetailScreen(
-                                      surahNumber: surah.number,
-                                      surahName: surah.arName,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
                           ),
           ),
         ],
