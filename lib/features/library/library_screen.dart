@@ -15,6 +15,7 @@ class LibraryScreen extends StatefulWidget {
 
 class _LibraryScreenState extends State<LibraryScreen> {
   final TextEditingController _searchController = TextEditingController();
+  String _filter = 'الكل'; // 'الكل' أو 'المحملة فقط'
 
   @override
   void initState() {
@@ -45,27 +46,50 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ),
       body: Column(
         children: [
-          // ─── بحث ───
+          // ─── البحث والفلتر ───
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: SearchBar(
-              controller: _searchController,
-              hintText: 'ابحث عن قارئ...',
-              hintStyle: WidgetStateProperty.all(
-                  TextStyle(fontFamily: AppConstants.fontCairo)),
-              textStyle: WidgetStateProperty.all(
-                  TextStyle(fontFamily: AppConstants.fontCairo)),
-              onChanged: (q) => provider.search(q),
-              leading: const Icon(Icons.search),
-              trailing: [
-                if (_searchController.text.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _searchController.clear();
-                      provider.search('');
-                    },
-                  ),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Column(
+              children: [
+                SearchBar(
+                  controller: _searchController,
+                  hintText: 'ابحث عن قارئ...',
+                  hintStyle: WidgetStateProperty.all(
+                      TextStyle(fontFamily: AppConstants.fontCairo)),
+                  textStyle: WidgetStateProperty.all(
+                      TextStyle(fontFamily: AppConstants.fontCairo)),
+                  onChanged: (q) => provider.search(q),
+                  leading: const Icon(Icons.search),
+                  trailing: [
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          provider.search('');
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // ─── فلتر الكل / المحملة فقط ───
+                Row(
+                  children: [
+                    _FilterChip(
+                      label: 'الكل',
+                      isSelected: _filter == 'الكل',
+                      onTap: () => setState(() => _filter = 'الكل'),
+                      color: color,
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'المحملة فقط',
+                      isSelected: _filter == 'المحملة',
+                      onTap: () => setState(() => _filter = 'المحملة'),
+                      color: color,
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -256,3 +280,39 @@ class _ReciterTile extends StatelessWidget {
     );
   }
 }
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final ColorScheme color;
+
+  const _FilterChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color.primary : color.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: AppConstants.fontCairo,
+            fontSize: 13,
+            color: isSelected ? color.onPrimary : color.onSurfaceVariant,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }

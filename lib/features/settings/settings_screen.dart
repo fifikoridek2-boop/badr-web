@@ -325,92 +325,70 @@ class _DeveloperCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
 
-    return Card(
-      elevation: 0,
-      color: color.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.person, color: color.tertiary, size: 30),
-                  const SizedBox(width: 10),
-                  Text(
-                    'المطور',
-                    style: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      fontSize: 25,
-                      fontWeight: FontWeight.bold,
-                      color: color.onSurface,
+    return _SettingsCard(
+      title: 'المطور',
+      icon: Icons.person_outline,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DeveloperAvatar(color: color),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Akio | اكيو',
+                      style: TextStyle(
+                        fontFamily: AppConstants.fontCairo,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: color.onSurface,
+                      ),
+                      textAlign: TextAlign.right,
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 22),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _DeveloperAvatar(color: color),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Akio | اكيو',
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: color.onSurface,
-                        ),
-                        textAlign: TextAlign.right,
+                    const SizedBox(height: 6),
+                    Text(
+                      'مطور شغوف بعمر 15 سنة. بدأت رحلتي مع البرمجة منذ عام تقريباً، ومنذ ذلك الحين وأنا أتعلم وآتي بمشاريع جديدة باستمرار.',
+                      style: TextStyle(
+                        fontFamily: AppConstants.fontCairo,
+                        fontSize: 13,
+                        height: 1.5,
+                        color: color.onSurfaceVariant,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'مرحباً! أنا Akio، مطور شغوف بعمر 15 سنة. بدأت رحلتي مع البرمجة منذ عام تقريباً، ومنذ ذلك الحين وأنا أتعلم وآتي بمشاريع جديدة باستمرار.',
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          fontSize: 18,
-                          height: 1.55,
-                          color: color.onSurfaceVariant,
-                        ),
-                        textAlign: TextAlign.right,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 26),
-            OutlinedButton.icon(
-              onPressed: SettingsScreen.openDeveloperWebsite,
-              icon: Icon(Icons.open_in_new, color: color.tertiary, size: 30),
-              label: Text(
-                'Akio | Codex',
-                style: TextStyle(
-                  fontFamily: AppConstants.fontCairo,
-                  fontSize: 22,
-                  color: color.tertiary,
+                      textAlign: TextAlign.right,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 64),
-                side: BorderSide(color: color.outline, width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: SettingsScreen.openDeveloperWebsite,
+            icon: Icon(Icons.open_in_new, color: color.tertiary, size: 18),
+            label: Text(
+              'Akio | Codex',
+              style: TextStyle(
+                fontFamily: AppConstants.fontCairo,
+                fontSize: 14,
+                color: color.tertiary,
               ),
             ),
-          ],
-        ),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 46),
+              side: BorderSide(color: color.outline.withValues(alpha: 0.5)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -424,19 +402,20 @@ class _DeveloperAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 104,
-      height: 104,
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
-        color: Colors.black,
+        color: color.primaryContainer,
         shape: BoxShape.circle,
         border: Border.all(
-          color: color.outlineVariant.withValues(alpha: 0.35),
+          color: color.outlineVariant.withValues(alpha: 0.3),
+          width: 1.5,
         ),
       ),
       child: Icon(
         Icons.face_6_outlined,
-        color: color.onPrimary,
-        size: 56,
+        color: color.onPrimaryContainer,
+        size: 32,
       ),
     );
   }

@@ -232,9 +232,13 @@ class _PlayerBoxState extends State<PlayerBox>
                     ),
                   ),
                 ),
-                Icon(Icons.download_outlined,
-                    color: color.onPrimaryContainer.withValues(alpha: 0.7),
-                    size: 20),
+                IconButton(
+                  icon: Icon(Icons.download_outlined,
+                      color: color.onPrimaryContainer.withValues(alpha: 0.7),
+                      size: 20),
+                  onPressed: () => _showDownloadDialog(context, provider),
+                  tooltip: 'تحميل الصوت',
+                ),
               ],
             ),
             Row(
@@ -255,6 +259,126 @@ class _PlayerBoxState extends State<PlayerBox>
           ],
         );
       },
+    );
+  }
+
+  void _showDownloadDialog(BuildContext context, LibraryProvider provider) {
+    final color = Theme.of(context).colorScheme;
+    final audioUrl = provider.audioService.currentUrl;
+    final surahName = provider.currentSurahName;
+    final reciterName = provider.currentReciter?.reciterName ?? '';
+
+    if (audioUrl == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.download, color: color.primary),
+            const SizedBox(width: 8),
+            Text(
+              'تحميل الصوت',
+              style: TextStyle(
+                fontFamily: AppConstants.fontCairo,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (surahName.isNotEmpty) ...[
+              Text(
+                'السورة: $surahName',
+                style: TextStyle(
+                  fontFamily: AppConstants.fontCairo,
+                  color: color.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+            if (reciterName.isNotEmpty) ...[
+              Text(
+                'القارئ: $reciterName',
+                style: TextStyle(
+                  fontFamily: AppConstants.fontCairo,
+                  color: color.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Text(
+              'سيتم تحميل الملف الصوتى على جهازك.',
+              style: TextStyle(
+                fontFamily: AppConstants.fontCairo,
+                fontSize: 13,
+                color: color.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: 0,
+                    backgroundColor: color.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '0%',
+                  style: TextStyle(
+                    fontFamily: AppConstants.fontCairo,
+                    fontSize: 12,
+                    color: color.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'جاري التحميل...',
+              style: TextStyle(
+                fontFamily: AppConstants.fontCairo,
+                fontSize: 11,
+                color: color.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'إلغاء',
+              style: TextStyle(fontFamily: AppConstants.fontCairo),
+            ),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'تم بدء تحميل $surahName',
+                    style: TextStyle(fontFamily: AppConstants.fontCairo),
+                  ),
+                  backgroundColor: color.primary,
+                ),
+              );
+            },
+            child: Text(
+              'تحميل',
+              style: TextStyle(fontFamily: AppConstants.fontCairo),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
