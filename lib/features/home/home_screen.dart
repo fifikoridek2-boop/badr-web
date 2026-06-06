@@ -6,6 +6,7 @@ import 'package:badr/core/constants/app_constants.dart';
 import 'package:badr/features/home/home_provider.dart';
 import 'package:badr/features/prayer/prayer_provider.dart';
 import 'package:badr/features/library/library_screen.dart';
+import 'package:badr/features/library/cloud_sync_screen.dart';
 import 'package:badr/features/tasbih/tasbih_screen.dart';
 import 'package:badr/features/radio/radio_screen.dart';
 import 'package:badr/features/settings/settings_screen.dart';
@@ -54,7 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.cloud_outlined),
-            onPressed: () {},
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CloudSyncScreen()),
+            ),
             tooltip: 'السحابة',
           ),
           IconButton(
@@ -133,7 +137,7 @@ class _ShimmerCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════
+// ════════════════════════════════════���══
 //  بطاقة وقت الصلاة
 // ═══════════════════════════════════════
 class _PrayerCard extends StatelessWidget {
