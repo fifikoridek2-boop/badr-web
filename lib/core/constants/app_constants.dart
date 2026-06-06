@@ -17,6 +17,7 @@ class AppConstants {
   // ═══════════════════════════════════════
   static const String logoPath = 'assets/images/logo.png';
   static const String adanPath = 'assets/audio/adan.mp3';
+  static const String developerImagePath = 'assets/images/developer.png';
 
   // ═══════════════════════════════════════
   //  Shared Preferences Keys
@@ -28,6 +29,9 @@ class AppConstants {
   static const String keyLastSurah = 'last_surah_read';
   static const String keyLastPage = 'last_page_read';
   static const String keyTasbihCounts = 'tasbih_counts';
+  static const String keyDownloadedAudios = 'downloaded_audios';
+  static const String keyDownloadedAzkar = 'downloaded_azkar';
+  static const String keyDownloadedLaylatQadr = 'downloaded_laylat_qadr';
 
   // ═══════════════════════════════════════
   //  قاعدة البيانات
