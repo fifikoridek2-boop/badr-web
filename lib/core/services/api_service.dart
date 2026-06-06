@@ -34,6 +34,8 @@ class ApiService {
   Future<dynamic> getDuas() async => await get(ApiConstants.duas);
   Future<dynamic> getPrayerTimes() async => await get(ApiConstants.prayerTimes);
   Future<dynamic> getReciters() async => await get(ApiConstants.reciters);
+  Future<dynamic> getLaylatAlQadr() async =>
+      await get(ApiConstants.laylatAlQadr);
   Future<dynamic> getReciterAudio(String reciterId) async =>
       await get(ApiConstants.reciterAudio, params: {'reciter_id': reciterId});
 

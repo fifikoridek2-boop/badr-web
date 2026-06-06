@@ -8,6 +8,8 @@ import 'package:badr/features/prayer/prayer_provider.dart';
 import 'package:badr/features/library/library_screen.dart';
 import 'package:badr/features/tasbih/tasbih_screen.dart';
 import 'package:badr/features/radio/radio_screen.dart';
+import 'package:badr/features/settings/settings_screen.dart';
+import 'package:badr/features/laylat_al_qadr/laylat_al_qadr_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -51,8 +53,17 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(Icons.cloud_outlined),
             onPressed: () {},
+            tooltip: 'السحابة',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+            tooltip: 'الإعدادات',
           ),
         ],
       ),
@@ -293,7 +304,9 @@ class _FeaturesGrid extends StatelessWidget {
       _Feature('الراديو', Icons.radio_outlined, () =>
           Navigator.push(context,
               MaterialPageRoute(builder: (_) => const RadioScreen()))),
-      _Feature('ليلة القدر', Icons.nights_stay_outlined, () {}),
+      _Feature('ليلة القدر', Icons.nights_stay_outlined, () =>
+          Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const LaylatAlQadrScreen()))),
     ];
 
     return GridView.count(
