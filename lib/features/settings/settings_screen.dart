@@ -35,7 +35,7 @@ class SettingsScreen extends StatelessWidget {
           _SettingsInfoCard(),
           SizedBox(height: 12),
           _SettingsTipsCard(),
-          SizedBox(height: 20),
+          SizedBox(height: 12),
           _DeveloperCard(),
         ],
       ),
@@ -219,7 +219,7 @@ class _SettingsTipsCard extends StatelessWidget {
           _SimpleSettingRow(
             icon: Icons.cloud_outlined,
             title: 'المزامنة السحابية',
-            value: 'قريباً',
+            value: 'متاح الآن',
           ),
         ],
       ),
@@ -328,9 +328,9 @@ class _DeveloperCard extends StatelessWidget {
     return Card(
       elevation: 0,
       color: color.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: Padding(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -339,13 +339,13 @@ class _DeveloperCard extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.person, color: color.tertiary, size: 30),
+                  Icon(Icons.person, color: color.tertiary, size: 24),
                   const SizedBox(width: 10),
                   Text(
                     'المطور',
                     style: TextStyle(
                       fontFamily: AppConstants.fontCairo,
-                      fontSize: 25,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: color.onSurface,
                     ),
@@ -353,12 +353,12 @@ class _DeveloperCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _DeveloperAvatar(color: color),
-                const SizedBox(width: 18),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -367,19 +367,19 @@ class _DeveloperCard extends StatelessWidget {
                         'Akio | اكيو',
                         style: TextStyle(
                           fontFamily: AppConstants.fontCairo,
-                          fontSize: 24,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: color.onSurface,
                         ),
                         textAlign: TextAlign.right,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
-                        'مرحباً! أنا Akio، مطور شغوف بعمر 15 سنة. بدأت رحلتي مع البرمجة منذ عام تقريباً، ومنذ ذلك الحين وأنا أتعلم وآتي بمشاريع جديدة باستمرار.',
+                        'مرحباً! أنا Akio، مطور شغوف. بدأت رحلتي مع البرمجة منذ سنة، ومنذ ذلك الحين وأنا أعمل على مشاريع جديدة.',
                         style: TextStyle(
                           fontFamily: AppConstants.fontCairo,
-                          fontSize: 18,
-                          height: 1.55,
+                          fontSize: 12,
+                          height: 1.4,
                           color: color.onSurfaceVariant,
                         ),
                         textAlign: TextAlign.right,
@@ -389,23 +389,23 @@ class _DeveloperCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: SettingsScreen.openDeveloperWebsite,
-              icon: Icon(Icons.open_in_new, color: color.tertiary, size: 30),
+              icon: Icon(Icons.open_in_new, color: color.tertiary, size: 20),
               label: Text(
                 'Akio | Codex',
                 style: TextStyle(
                   fontFamily: AppConstants.fontCairo,
-                  fontSize: 22,
+                  fontSize: 14,
                   color: color.tertiary,
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 64),
+                minimumSize: const Size(double.infinity, 48),
                 side: BorderSide(color: color.outline, width: 2),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
             ),
@@ -424,8 +424,8 @@ class _DeveloperAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 104,
-      height: 104,
+      width: 80,
+      height: 80,
       decoration: BoxDecoration(
         color: Colors.black,
         shape: BoxShape.circle,
@@ -433,10 +433,16 @@ class _DeveloperAvatar extends StatelessWidget {
           color: color.outlineVariant.withValues(alpha: 0.35),
         ),
       ),
-      child: Icon(
-        Icons.face_6_outlined,
-        color: color.onPrimary,
-        size: 56,
+      child: ClipOval(
+        child: Image.asset(
+          AppConstants.developerImagePath,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Icon(
+            Icons.face_6_outlined,
+            color: color.onPrimary,
+            size: 40,
+          ),
+        ),
       ),
     );
   }
