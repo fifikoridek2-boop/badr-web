@@ -1422,7 +1422,6 @@ class _DropdownOverlay extends StatelessWidget {
       width: MediaQuery.of(context).size.width - 64,
       child: CompositedTransformFollower(
         link: layerLink,
-        showAbove: true,
         offset: const Offset(0, 50),
         child: Material(
           elevation: 8,
