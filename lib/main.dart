@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/constants/app_constants.dart';
 import 'core/theme/theme.dart';
+import 'core/theme/theme_provider.dart';
 import 'features/splash/splash_screen.dart';
 import 'features/home/home_provider.dart';
 import 'features/quran/quran_provider.dart';
@@ -78,31 +79,5 @@ class BadrApp extends StatelessWidget {
       },
       home: const SplashScreen(),
     );
-  }
-}
-
-class ThemeProvider extends ChangeNotifier {
-  ThemeMode _themeMode;
-
-  ThemeProvider(String saved) : _themeMode = _fromString(saved);
-
-  ThemeMode get themeMode => _themeMode;
-
-  static ThemeMode _fromString(String value) {
-    switch (value) {
-      case 'light':
-        return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      default:
-        return ThemeMode.system;
-    }
-  }
-
-  Future<void> setTheme(String value) async {
-    _themeMode = _fromString(value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AppConstants.keyThemeMode, value);
-    notifyListeners();
   }
 }
