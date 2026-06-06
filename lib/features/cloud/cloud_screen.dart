@@ -109,6 +109,9 @@ class _CloudScreenState extends State<CloudScreen> {
   
   // بوكس التحميل المعروض
   String? _activeDownloadKey;
+  
+  // الصوتيات المحملة
+  Set<String> _downloadedAudios = {};
 
   @override
   void initState() {
@@ -116,6 +119,26 @@ class _CloudScreenState extends State<CloudScreen> {
     _checkDownloadStatus();
     _loadReciters();
     _loadSurahs();
+    _loadDownloadedAudios();
+  }
+
+  Future<void> _loadDownloadedAudios() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getStringList('downloaded_audios') ?? [];
+    setState(() {
+      _downloadedAudios = data.toSet();
+    });
+  }
+
+  Future<void> _saveDownloadedAudio(String reciterId, String surahId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = '${reciterId}_$surahId';
+    _downloadedAudios.add(key);
+    await prefs.setStringList('downloaded_audios', _downloadedAudios.toList());
+  }
+
+  bool _isAudioDownloaded(String reciterId, String surahId) {
+    return _downloadedAudios.contains('${reciterId}_$surahId');
   }
 
   Future<void> _checkDownloadStatus() async {
@@ -312,6 +335,9 @@ class _CloudScreenState extends State<CloudScreen> {
       }
       
       if (mounted && !cancelToken.isCancelled) {
+        // حفظ الصوتي المحمل
+        await _saveDownloadedAudio(_selectedReciterId!, _selectedSurahId!);
+        
         setState(() {
           _audioDownloads[key] = _audioDownloads[key]!.copyWith(
             isDownloading: false,
