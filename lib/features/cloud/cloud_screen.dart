@@ -11,56 +11,113 @@ class DownloadInfo {
   final double progress;
   final bool isDownloading;
   final bool isCompleted;
+  final bool isFailed;
   final String speed;
   final String fileSize;
   final String downloadedSize;
   final String remainingTime;
   final String? error;
-  final String? fileName;
+  final String? surahId;
+  final String? surahName;
+  final String? reciterId;
   final String? reciterName;
   final CancelToken? cancelToken;
+  final DateTime? startTime;
 
   DownloadInfo({
     this.progress = 0,
     this.isDownloading = false,
     this.isCompleted = false,
+    this.isFailed = false,
     this.speed = '',
     this.fileSize = '',
     this.downloadedSize = '',
     this.remainingTime = '',
     this.error,
-    this.fileName,
+    this.surahId,
+    this.surahName,
+    this.reciterId,
     this.reciterName,
     this.cancelToken,
+    this.startTime,
   });
+
+  String get key => '${reciterId}_$surahId';
 
   DownloadInfo copyWith({
     double? progress,
     bool? isDownloading,
     bool? isCompleted,
+    bool? isFailed,
     String? speed,
     String? fileSize,
     String? downloadedSize,
     String? remainingTime,
     String? error,
-    String? fileName,
+    String? surahId,
+    String? surahName,
+    String? reciterId,
     String? reciterName,
     CancelToken? cancelToken,
+    DateTime? startTime,
   }) {
     return DownloadInfo(
       progress: progress ?? this.progress,
       isDownloading: isDownloading ?? this.isDownloading,
       isCompleted: isCompleted ?? this.isCompleted,
+      isFailed: isFailed ?? this.isFailed,
       speed: speed ?? this.speed,
       fileSize: fileSize ?? this.fileSize,
       downloadedSize: downloadedSize ?? this.downloadedSize,
       remainingTime: remainingTime ?? this.remainingTime,
       error: error ?? this.error,
-      fileName: fileName ?? this.fileName,
+      surahId: surahId ?? this.surahId,
+      surahName: surahName ?? this.surahName,
+      reciterId: reciterId ?? this.reciterId,
       reciterName: reciterName ?? this.reciterName,
       cancelToken: cancelToken ?? this.cancelToken,
+      startTime: startTime ?? this.startTime,
     );
   }
+}
+
+// ═══════════════════════════════════════
+//  نموذج صوتي محمل
+// ═══════════════════════════════════════
+class DownloadedAudio {
+  final String surahId;
+  final String surahName;
+  final String reciterId;
+  final String reciterName;
+  final String? fileSize;
+  final DateTime downloadedAt;
+
+  DownloadedAudio({
+    required this.surahId,
+    required this.surahName,
+    required this.reciterId,
+    required this.reciterName,
+    this.fileSize,
+    required this.downloadedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'surahId': surahId,
+        'surahName': surahName,
+        'reciterId': reciterId,
+        'reciterName': reciterName,
+        'fileSize': fileSize,
+        'downloadedAt': downloadedAt.toIso8601String(),
+      };
+
+  factory DownloadedAudio.fromJson(Map<String, dynamic> json) => DownloadedAudio(
+        surahId: json['surahId'],
+        surahName: json['surahName'],
+        reciterId: json['reciterId'],
+        reciterName: json['reciterName'],
+        fileSize: json['fileSize'],
+        downloadedAt: DateTime.parse(json['downloadedAt']),
+      );
 }
 
 // ═══════════════════════════════════════
@@ -75,72 +132,47 @@ class CloudScreen extends StatefulWidget {
 
 class _CloudScreenState extends State<CloudScreen> {
   final ApiService _api = ApiService();
-  final Dio _dio = Dio();
   
-  // التحميلات
+  // ═══ التحميلات العامة ═══
   bool _isAzkarDownloaded = false;
   bool _isLaylatDownloaded = false;
-  final Map<String, DownloadInfo> _audioDownloads = {};
-  
-  // عناصر التحكم
   bool _isLoadingAzkar = false;
   bool _isLoadingLaylat = false;
   
-  // تصفية الصوتيات
-  String _audioFilter = 'الكل';
-  
-  // القراء
+  // ═══ القراء ═══
   List<Map<String, dynamic>> _reciters = [];
   bool _isLoadingReciters = false;
   String? _selectedReciterId;
   String? _selectedReciterName;
   
-  // السور
+  // ═══ السور ═══
   List<Map<String, dynamic>> _surahs = [];
   bool _isLoadingSurahs = false;
   String? _selectedSurahId;
   String? _selectedSurahName;
   
-  // البحث
-  final TextEditingController _reciterSearchController = TextEditingController();
-  final TextEditingController _surahSearchController = TextEditingController();
-  List<Map<String, dynamic>> _filteredReciters = [];
-  List<Map<String, dynamic>> _filteredSurahs = [];
+  // ═══ التحميلات النشطة ═══
+  final Map<String, DownloadInfo> _activeDownloads = {};
   
-  // بوكس التحميل المعروض
-  String? _activeDownloadKey;
+  // ═══ الصوتيات المحملة ═══
+  List<DownloadedAudio> _downloadedAudios = [];
   
-  // الصوتيات المحملة
-  Set<String> _downloadedAudios = {};
+  // ═══ الفلتر ═══
+  String _filter = 'الكل'; // 'الكل' أو 'المحملة فقط'
 
   @override
   void initState() {
     super.initState();
-    _checkDownloadStatus();
     _loadReciters();
     _loadSurahs();
     _loadDownloadedAudios();
+    _checkDownloadStatus();
   }
 
-  Future<void> _loadDownloadedAudios() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getStringList('downloaded_audios') ?? [];
-    setState(() {
-      _downloadedAudios = data.toSet();
-    });
-  }
-
-  Future<void> _saveDownloadedAudio(String reciterId, String surahId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = '${reciterId}_$surahId';
-    _downloadedAudios.add(key);
-    await prefs.setStringList('downloaded_audios', _downloadedAudios.toList());
-  }
-
-  bool _isAudioDownloaded(String reciterId, String surahId) {
-    return _downloadedAudios.contains('${reciterId}_$surahId');
-  }
-
+  // ═══════════════════════════════════════
+  //  تحميل البيانات
+  // ═══════════════════════════════════════
+  
   Future<void> _checkDownloadStatus() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -157,10 +189,9 @@ class _CloudScreenState extends State<CloudScreen> {
       final reciters = (data['reciters'] as List?) ?? [];
       setState(() {
         _reciters = reciters.cast<Map<String, dynamic>>();
-        _filteredReciters = List.from(_reciters);
       });
     } catch (e) {
-      // تجاهل الخطأ
+      // تجاهل
     } finally {
       setState(() => _isLoadingReciters = false);
     }
@@ -174,40 +205,69 @@ class _CloudScreenState extends State<CloudScreen> {
       final surahs = (data['surahs'] as List?) ?? [];
       setState(() {
         _surahs = surahs.cast<Map<String, dynamic>>();
-        _filteredSurahs = List.from(_surahs);
       });
     } catch (e) {
-      // تجاهل الخطأ
+      // تجاهل
     } finally {
       setState(() => _isLoadingSurahs = false);
     }
   }
 
-  void _filterReciters(String query) {
-    if (query.isEmpty) {
-      setState(() => _filteredReciters = List.from(_reciters));
-    } else {
-      setState(() {
-        _filteredReciters = _reciters
-            .where((r) => r['reciter_name'].toString().contains(query))
-            .toList();
-      });
-    }
+  Future<void> _loadDownloadedAudios() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getStringList('downloaded_audios') ?? [];
+    setState(() {
+      _downloadedAudios = data
+          .map((json) => DownloadedAudio.fromJson(
+              Map<String, dynamic>.from(_decodeJsonString(json))))
+          .toList();
+    });
   }
 
-  void _filterSurahs(String query) {
-    if (query.isEmpty) {
-      setState(() => _filteredSurahs = List.from(_surahs));
-    } else {
-      setState(() {
-        _filteredSurahs = _surahs
-            .where((s) =>
-                s['name'].toString().contains(query) ||
-                s['number'].toString().contains(query))
-            .toList();
-      });
+  Map<String, dynamic> _decodeJsonString(String jsonString) {
+    // بسيط: نفترض أن البيانات مخزنة كـ "reciterId|surahId|surahName|reciterName"
+    final parts = jsonString.split('|');
+    if (parts.length >= 4) {
+      return {
+        'reciterId': parts[0],
+        'surahId': parts[1],
+        'surahName': parts[2],
+        'reciterName': parts[3],
+        'downloadedAt': parts.length > 4 ? parts[4] : DateTime.now().toIso8601String(),
+      };
     }
+    return {};
   }
+
+  String _encodeToJsonString(DownloadedAudio audio) {
+    return '${audio.reciterId}|${audio.surahId}|${audio.surahName}|${audio.reciterName}|${audio.downloadedAt.toIso8601String()}';
+  }
+
+  Future<void> _saveDownloadedAudio(DownloadedAudio audio) async {
+    final prefs = await SharedPreferences.getInstance();
+    _downloadedAudios.add(audio);
+    final data = _downloadedAudios.map((a) => _encodeToJsonString(a)).toList();
+    await prefs.setStringList('downloaded_audios', data);
+    setState(() {});
+  }
+
+  bool _isAudioDownloaded(String reciterId, String surahId) {
+    return _downloadedAudios.any(
+        (a) => a.reciterId == reciterId && a.surahId == surahId);
+  }
+
+  Future<void> _removeDownloadedAudio(String reciterId, String surahId) async {
+    final prefs = await SharedPreferences.getInstance();
+    _downloadedAudios.removeWhere(
+        (a) => a.reciterId == reciterId && a.surahId == surahId);
+    final data = _downloadedAudios.map((a) => _encodeToJsonString(a)).toList();
+    await prefs.setStringList('downloaded_audios', data);
+    setState(() {});
+  }
+
+  // ═══════════════════════════════════════
+  //  تحميل الأذكار وليلة القدر
+  // ═══════════════════════════════════════
 
   Future<void> _downloadAzkar() async {
     setState(() => _isLoadingAzkar = true);
@@ -239,6 +299,192 @@ class _CloudScreenState extends State<CloudScreen> {
     }
   }
 
+  // ═══════════════════════════════════════
+  //  تحميل صوتي
+  // ═══════════════════════════════════════
+
+  Future<void> _downloadAudio() async {
+    if (_selectedReciterId == null ||
+        _selectedSurahId == null ||
+        _selectedReciterName == null ||
+        _selectedSurahName == null) {
+      _showErrorSnackBar('اختر القارئ والسورة أولاً');
+      return;
+    }
+
+    final key = '${_selectedReciterId}_$_selectedSurahId';
+    
+    // تحقق إذا كان التحميل جاري أو مكتمل
+    if (_activeDownloads.containsKey(key)) {
+      _showErrorSnackBar('هذا الصوت قيد التحميل بالفعل');
+      return;
+    }
+
+    if (_isAudioDownloaded(_selectedReciterId!, _selectedSurahId!)) {
+      _showErrorSnackBar('هذا الصوت محمل مسبقاً');
+      return;
+    }
+
+    final cancelToken = CancelToken();
+    final downloadInfo = DownloadInfo(
+      isDownloading: true,
+      surahId: _selectedSurahId,
+      surahName: _selectedSurahName,
+      reciterId: _selectedReciterId,
+      reciterName: _selectedReciterName,
+      cancelToken: cancelToken,
+      startTime: DateTime.now(),
+    );
+
+    setState(() {
+      _activeDownloads[key] = downloadInfo;
+    });
+
+    // محاكاة التحميل
+    try {
+      double progress = 0;
+      const totalSize = 5.2; // MB
+
+      while (progress < 1 && !cancelToken.isCancelled) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        progress += 0.02;
+        final downloaded = (progress * totalSize);
+        final speed = (progress * 2.5);
+        final elapsed = DateTime.now().difference(downloadInfo.startTime!).inSeconds;
+        final remaining = elapsed > 0 ? ((1 - progress) / (progress / elapsed)) : 0;
+
+        if (mounted) {
+          setState(() {
+            _activeDownloads[key] = _activeDownloads[key]!.copyWith(
+              progress: progress,
+              downloadedSize: downloaded.toStringAsFixed(1),
+              fileSize: totalSize.toStringAsFixed(1),
+              speed: '${speed.toStringAsFixed(1)} MB/s',
+              remainingTime: '${remaining.toInt()} ثانية',
+            );
+          });
+        }
+      }
+
+      if (cancelToken.isCancelled) {
+        setState(() {
+          _activeDownloads.remove(key);
+        });
+        return;
+      }
+
+      // حفظ الصوتي المحمل
+      await _saveDownloadedAudio(DownloadedAudio(
+        surahId: _selectedSurahId!,
+        surahName: _selectedSurahName!,
+        reciterId: _selectedReciterId!,
+        reciterName: _selectedReciterName!,
+        downloadedAt: DateTime.now(),
+      ));
+
+      if (mounted) {
+        setState(() {
+          _activeDownloads[key] = _activeDownloads[key]!.copyWith(
+            isDownloading: false,
+            isCompleted: true,
+            progress: 1.0,
+          );
+        });
+        _showSuccessSnackBar('تم تحميل ${_selectedSurahName} بنجاح');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _activeDownloads[key] = _activeDownloads[key]!.copyWith(
+            isDownloading: false,
+            isFailed: true,
+            error: 'فشل التحميل',
+          );
+        });
+        _showErrorSnackBar('فشل تحميل ${_selectedSurahName}');
+      }
+    }
+  }
+
+  void _cancelDownload(String key) {
+    final download = _activeDownloads[key];
+    download?.cancelToken?.cancel();
+    setState(() {
+      _activeDownloads.remove(key);
+    });
+  }
+
+  void _removeCompletedDownload(String key) {
+    setState(() {
+      _activeDownloads.remove(key);
+    });
+  }
+
+  // ═══════════════════════════════════════
+  //  فتح اختيار القارئ (BottomSheet)
+  // ═══════════════════════════════════════
+
+  void _showReciterSelector() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ReciterSelector(
+        reciters: _reciters,
+        isLoading: _isLoadingReciters,
+        onSelect: (id, name) {
+          setState(() {
+            _selectedReciterId = id;
+            _selectedReciterName = name;
+          });
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════
+  //  فتح اختيار السورة (BottomSheet)
+  // ═══════════════════════════════════════
+
+  void _showSurahSelector() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _SurahSelector(
+        surahs: _surahs,
+        isLoading: _isLoadingSurahs,
+        onSelect: (id, name) {
+          setState(() {
+            _selectedSurahId = id;
+            _selectedSurahName = name;
+          });
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  void _clearReciterSelection() {
+    setState(() {
+      _selectedReciterId = null;
+      _selectedReciterName = null;
+    });
+  }
+
+  void _clearSurahSelection() {
+    setState(() {
+      _selectedSurahId = null;
+      _selectedSurahName = null;
+    });
+  }
+
+  // ═══════════════════════════════════════
+  //  رسائل التنبيه
+  // ═══════════════════════════════════════
+
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message, style: TextStyle(fontFamily: AppConstants.fontCairo)),
@@ -253,383 +499,9 @@ class _CloudScreenState extends State<CloudScreen> {
     ));
   }
 
-  void _selectReciter(String id, String name) {
-    setState(() {
-      _selectedReciterId = id;
-      _selectedReciterName = name;
-      _filteredReciters = [];
-    });
-    _reciterSearchController.text = name;
-  }
-
-  void _selectSurah(String id, String name) {
-    setState(() {
-      _selectedSurahId = id;
-      _selectedSurahName = name;
-      _filteredSurahs = [];
-    });
-    _surahSearchController.text = name;
-  }
-
-  void _clearReciterSelection() {
-    setState(() {
-      _selectedReciterId = null;
-      _selectedReciterName = null;
-      _filteredReciters = List.from(_reciters);
-    });
-    _reciterSearchController.clear();
-  }
-
-  void _clearSurahSelection() {
-    setState(() {
-      _selectedSurahId = null;
-      _selectedSurahName = null;
-      _filteredSurahs = List.from(_surahs);
-    });
-    _surahSearchController.clear();
-  }
-
-  Future<void> _startDownload() async {
-    if (_selectedReciterId == null || _selectedSurahId == null) {
-      _showErrorSnackBar('اختر القارئ والسورة أولاً');
-      return;
-    }
-
-    final key = '${_selectedReciterId}_${_selectedSurahId}';
-    final cancelToken = CancelToken();
-    
-    setState(() {
-      _activeDownloadKey = key;
-      _audioDownloads[key] = DownloadInfo(
-        isDownloading: true,
-        fileName: _selectedSurahName,
-        reciterName: _selectedReciterName,
-        cancelToken: cancelToken,
-      );
-    });
-
-    try {
-      // محاكاة التحميل الحقيقي
-      double progress = 0;
-      while (progress < 1) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (cancelToken.isCancelled) break;
-        
-        progress += 0.05;
-        final downloaded = (progress * 5.2).toStringAsFixed(1);
-        final total = '5.2';
-        final speed = '${(progress * 2.5).toStringAsFixed(1)} MB/s';
-        final remaining = '${((1 - progress) * 2).toStringAsFixed(0)} ثانية';
-        
-        if (mounted) {
-          setState(() {
-            _audioDownloads[key] = _audioDownloads[key]!.copyWith(
-              progress: progress,
-              downloadedSize: downloaded,
-              fileSize: total,
-              speed: speed,
-              remainingTime: remaining,
-            );
-          });
-        }
-      }
-      
-      if (mounted && !cancelToken.isCancelled) {
-        // حفظ الصوتي المحمل
-        await _saveDownloadedAudio(_selectedReciterId!, _selectedSurahId!);
-        
-        setState(() {
-          _audioDownloads[key] = _audioDownloads[key]!.copyWith(
-            isDownloading: false,
-            isCompleted: true,
-            progress: 1.0,
-          );
-        });
-        _showSuccessSnackBar('تم تحميل $_selectedSurahName بنجاح');
-      }
-    } catch (e) {
-      setState(() {
-        _audioDownloads[key] = _audioDownloads[key]!.copyWith(
-          isDownloading: false,
-          error: 'فشل التحميل',
-        );
-      });
-      _showErrorSnackBar('فشل تحميل الملف');
-    }
-  }
-
-  void _cancelDownload(String key) {
-    final download = _audioDownloads[key];
-    download?.cancelToken?.cancel();
-    setState(() {
-      _audioDownloads.remove(key);
-      if (_activeDownloadKey == key) {
-        _activeDownloadKey = null;
-      }
-    });
-  }
-
-  void _showDownloadDialog() {
-    if (_selectedReciterId == null || _selectedSurahId == null) {
-      _showErrorSnackBar('اختر القارئ والسورة أولاً');
-      return;
-    }
-
-    final key = '${_selectedReciterId}_${_selectedSurahId}';
-    final existingDownload = _audioDownloads[key];
-    
-    // إذا كان التحميل جاري، اعرض تفاصيله
-    if (existingDownload != null && existingDownload.isDownloading) {
-      _showDownloadDetailsDialog(key, existingDownload);
-      return;
-    }
-    
-    // وإلا، اعرض حوار التأكيد
-    _showConfirmDialog(key);
-  }
-
-  void _showConfirmDialog(String key) {
-    final color = Theme.of(context).colorScheme;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.download, color: color.primary),
-            const SizedBox(width: 8),
-            Text(
-              'تأكيد التحميل',
-              style: TextStyle(
-                fontFamily: AppConstants.fontCairo,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'السورة: $_selectedSurahName',
-              style: TextStyle(
-                fontFamily: AppConstants.fontCairo,
-                color: color.onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'القارئ: $_selectedReciterName',
-              style: TextStyle(
-                fontFamily: AppConstants.fontCairo,
-                color: color.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'سيتم تحميل الملف على جهازك.',
-              style: TextStyle(
-                fontFamily: AppConstants.fontCairo,
-                fontSize: 13,
-                color: color.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'إلغاء',
-              style: TextStyle(fontFamily: AppConstants.fontCairo),
-            ),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _startDownload();
-            },
-            child: Text(
-              'تحميل',
-              style: TextStyle(fontFamily: AppConstants.fontCairo),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDownloadDetailsDialog(String key, DownloadInfo info) {
-    final color = Theme.of(context).colorScheme;
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          // الاستماع للتحديثات
-          final currentInfo = _audioDownloads[key] ?? info;
-          
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                Icon(
-                  currentInfo.isCompleted ? Icons.check_circle : Icons.downloading,
-                  color: currentInfo.isCompleted ? Colors.green : color.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    currentInfo.isCompleted ? 'تم التحميل' : 'جاري التحميل',
-                    style: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (currentInfo.fileName != null) ...[
-                  Text(
-                    'السورة: ${currentInfo.fileName}',
-                    style: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      color: color.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                ],
-                if (currentInfo.reciterName != null) ...[
-                  Text(
-                    'القارئ: ${currentInfo.reciterName}',
-                    style: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      color: color.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                
-                // شريط التقدم
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: currentInfo.progress,
-                    minHeight: 12,
-                    backgroundColor: color.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      currentInfo.isCompleted ? Colors.green : color.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                
-                // النسبة المئوية
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${(currentInfo.progress * 100).toInt()}%',
-                      style: TextStyle(
-                        fontFamily: AppConstants.fontCairo,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: currentInfo.isCompleted ? Colors.green : color.primary,
-                      ),
-                    ),
-                    if (currentInfo.speed.isNotEmpty)
-                      Text(
-                        currentInfo.speed,
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          fontSize: 12,
-                          color: color.onSurfaceVariant,
-                        ),
-                      ),
-                  ],
-                ),
-                
-                const SizedBox(height: 8),
-                
-                // الحجم
-                Row(
-                  children: [
-                    Text(
-                      'الحجم: ',
-                      style: TextStyle(
-                        fontFamily: AppConstants.fontCairo,
-                        fontSize: 12,
-                        color: color.onSurfaceVariant,
-                      ),
-                    ),
-                    Text(
-                      '${currentInfo.downloadedSize} / ${currentInfo.fileSize} MB',
-                      style: TextStyle(
-                        fontFamily: AppConstants.fontCairo,
-                        fontSize: 12,
-                        color: color.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // الوقت المتبقي
-                if (currentInfo.remainingTime.isNotEmpty && !currentInfo.isCompleted) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'الوقت المتبقي: ${currentInfo.remainingTime}',
-                    style: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      fontSize: 12,
-                      color: color.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              if (!currentInfo.isCompleted)
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _cancelDownload(key);
-                  },
-                  child: Text(
-                    'إلغاء',
-                    style: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      color: color.error,
-                    ),
-                  ),
-                ),
-              if (currentInfo.isCompleted)
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'تم',
-                    style: TextStyle(fontFamily: AppConstants.fontCairo),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _reciterSearchController.dispose();
-    _surahSearchController.dispose();
-    super.dispose();
-  }
+  // ═══════════════════════════════════════
+  //  بناء الواجهة
+  // ═══════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
@@ -662,7 +534,7 @@ class _CloudScreenState extends State<CloudScreen> {
             color: color,
           ),
           const SizedBox(height: 12),
-          
+
           // ═══ بطاقة ليلة القدر ═══
           _DownloadCard(
             icon: Icons.nights_stay_outlined,
@@ -673,48 +545,33 @@ class _CloudScreenState extends State<CloudScreen> {
             onDownload: _downloadLaylatAlQadr,
             color: color,
           ),
-          const SizedBox(height: 12),
-          
-          // ═══ بطاقة الصوتيات ═══
-          _AudioSectionCard(
+          const SizedBox(height: 20),
+
+          // ═══ قسم الصوتيات ═══
+          _AudioSection(
             color: color,
-            filter: _audioFilter,
-            onFilterChanged: (f) => setState(() => _audioFilter = f),
-            // القراء
-            reciters: _filteredReciters,
-            isLoadingReciters: _isLoadingReciters,
-            selectedReciterId: _selectedReciterId,
+            filter: _filter,
+            onFilterChanged: (f) => setState(() => _filter = f),
+            // القارئ
             selectedReciterName: _selectedReciterName,
-            onReciterSelected: _selectReciter,
+            onSelectReciter: _showReciterSelector,
             onClearReciter: _clearReciterSelection,
-            reciterSearchController: _reciterSearchController,
-            onReciterSearchChanged: _filterReciters,
-            // السور
-            surahs: _filteredSurahs,
-            isLoadingSurahs: _isLoadingSurahs,
-            selectedSurahId: _selectedSurahId,
+            // السورة
             selectedSurahName: _selectedSurahName,
-            onSurahSelected: _selectSurah,
+            onSelectSurah: _showSurahSelector,
             onClearSurah: _clearSurahSelection,
-            surahSearchController: _surahSearchController,
-            onSurahSearchChanged: _filterSurahs,
-            // الأزرار
-            onDownload: _showDownloadDialog,
+            // زر التحميل
+            onDownload: _downloadAudio,
+            canDownload: _selectedReciterId != null &&
+                _selectedSurahId != null &&
+                !_isAudioDownloaded(_selectedReciterId!, _selectedSurahId!),
             // التحميلات النشطة
-            audioDownloads: _audioDownloads,
-            activeDownloadKey: _activeDownloadKey,
-            onShowDetails: (key) => _showDownloadDetailsDialog(key, _audioDownloads[key]!),
-            onCancel: _cancelDownload,
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // ═══ مؤشر التحميل العام ═══
-          _GlobalProgressCard(
-            color: color,
-            isAzkarDownloaded: _isAzkarDownloaded,
-            isLaylatDownloaded: _isLaylatDownloaded,
-            downloadedAudiosCount: _audioDownloads.values.where((d) => d.isCompleted).length,
+            activeDownloads: _activeDownloads,
+            onCancelDownload: _cancelDownload,
+            onRemoveCompleted: _removeCompletedDownload,
+            // الصوتيات المحملة
+            downloadedAudios: _downloadedAudios,
+            onDeleteDownloaded: _removeDownloadedAudio,
           ),
         ],
       ),
@@ -723,7 +580,302 @@ class _CloudScreenState extends State<CloudScreen> {
 }
 
 // ═══════════════════════════════════════
-//  بطاقة التحميل الأساسية
+//  قسم الصوتيات
+// ═══════════════════════════════════════
+class _AudioSection extends StatelessWidget {
+  final ColorScheme color;
+  final String filter;
+  final ValueChanged<String> onFilterChanged;
+  final String? selectedReciterName;
+  final VoidCallback onSelectReciter;
+  final VoidCallback onClearReciter;
+  final String? selectedSurahName;
+  final VoidCallback onSelectSurah;
+  final VoidCallback onClearSurah;
+  final VoidCallback onDownload;
+  final bool canDownload;
+  final Map<String, DownloadInfo> activeDownloads;
+  final Function(String) onCancelDownload;
+  final Function(String) onRemoveCompleted;
+  final List<DownloadedAudio> downloadedAudios;
+  final Function(String, String) onDeleteDownloaded;
+
+  const _AudioSection({
+    required this.color,
+    required this.filter,
+    required this.onFilterChanged,
+    required this.selectedReciterName,
+    required this.onSelectReciter,
+    required this.onClearReciter,
+    required this.selectedSurahName,
+    required this.onSelectSurah,
+    required this.onClearSurah,
+    required this.onDownload,
+    required this.canDownload,
+    required this.activeDownloads,
+    required this.onCancelDownload,
+    required this.onRemoveCompleted,
+    required this.downloadedAudios,
+    required this.onDeleteDownloaded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ═══ العنوان ═══
+        Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.headphones_outlined, color: color.primary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'الصوتيات',
+              style: TextStyle(
+                fontFamily: AppConstants.fontCairo,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color.onSurface,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // ═══ فلتر الكل / المحملة فقط ═══
+        Row(
+          children: [
+            _FilterChip(
+              label: 'الكل',
+              isSelected: filter == 'الكل',
+              onTap: () => onFilterChanged('الكل'),
+              color: color,
+            ),
+            const SizedBox(width: 8),
+            _FilterChip(
+              label: 'المحملة فقط',
+              isSelected: filter == 'المحملة',
+              onTap: () => onFilterChanged('المحملة'),
+              color: color,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // ═══ اختيار القارئ والسورة ═══
+        Card(
+          elevation: 0,
+          color: color.surfaceContainerHigh,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // القارئ
+                Text(
+                  'اختر القارئ',
+                  style: TextStyle(
+                    fontFamily: AppConstants.fontCairo,
+                    fontSize: 12,
+                    color: color.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _SelectionButton(
+                  icon: Icons.person_outline,
+                  label: selectedReciterName ?? 'اختر قارئاً',
+                  isSelected: selectedReciterName != null,
+                  onTap: onSelectReciter,
+                  onClear: selectedReciterName != null ? onClearReciter : null,
+                  color: color,
+                  backgroundColor: color.primaryContainer,
+                  textColor: color.onPrimaryContainer,
+                ),
+                const SizedBox(height: 16),
+
+                // السورة
+                Text(
+                  'اختر السورة',
+                  style: TextStyle(
+                    fontFamily: AppConstants.fontCairo,
+                    fontSize: 12,
+                    color: color.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _SelectionButton(
+                  icon: Icons.menu_book_outlined,
+                  label: selectedSurahName ?? 'اختر سورة',
+                  isSelected: selectedSurahName != null,
+                  onTap: onSelectSurah,
+                  onClear: selectedSurahName != null ? onClearSurah : null,
+                  color: color,
+                  backgroundColor: color.secondaryContainer,
+                  textColor: color.onSecondaryContainer,
+                ),
+                const SizedBox(height: 16),
+
+                // زر التحميل
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: canDownload ? onDownload : null,
+                    icon: Icon(Icons.download, size: 20),
+                    label: Text(
+                      canDownload ? 'تحميل' : 'اختر القارئ والسورة',
+                      style: TextStyle(fontFamily: AppConstants.fontCairo),
+                    ),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // ═══ التحميلات النشطة ═══
+        if (activeDownloads.isNotEmpty) ...[
+          _SectionTitle(
+            title: 'التحميلات النشطة',
+            icon: Icons.downloading,
+            color: color,
+          ),
+          const SizedBox(height: 8),
+          ...activeDownloads.values.map((info) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _ActiveDownloadCard(
+                  info: info,
+                  color: color,
+                  onCancel: () => onCancelDownload(info.key),
+                  onRemove: () => onRemoveCompleted(info.key),
+                ),
+              )),
+          const SizedBox(height: 12),
+        ],
+
+        // ═══ الصوتيات المحملة ═══
+        if (filter == 'المحملة' || downloadedAudios.isNotEmpty) ...[
+          _SectionTitle(
+            title: filter == 'المحملة' ? 'الصوتيات المحملة' : 'الصوتيات المحملة',
+            icon: Icons.folder_outlined,
+            color: color,
+          ),
+          const SizedBox(height: 8),
+          if (downloadedAudios.isEmpty)
+            Card(
+              elevation: 0,
+              color: color.surfaceContainerHigh,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.cloud_off_outlined,
+                          size: 48, color: color.onSurfaceVariant.withValues(alpha: 0.5)),
+                      const SizedBox(height: 8),
+                      Text(
+                        'لا توجد صوتيات محملة',
+                        style: TextStyle(
+                          fontFamily: AppConstants.fontCairo,
+                          color: color.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            ..._buildDownloadedAudiosList(color),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _buildDownloadedAudiosList(ColorScheme color) {
+    // تجميع الصوتيات حسب القارئ
+    final Map<String, List<DownloadedAudio>> grouped = {};
+    for (final audio in downloadedAudios) {
+      if (!grouped.containsKey(audio.reciterName)) {
+        grouped[audio.reciterName] = [];
+      }
+      grouped[audio.reciterName]!.add(audio);
+    }
+
+    return grouped.entries.map((entry) {
+      return Card(
+        elevation: 0,
+        color: color.surfaceContainerHigh,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // عنوان القارئ
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.primaryContainer.withValues(alpha: 0.5),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.person, size: 18, color: color.onPrimaryContainer),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      entry.key,
+                      style: TextStyle(
+                        fontFamily: AppConstants.fontCairo,
+                        fontWeight: FontWeight.bold,
+                        color: color.onPrimaryContainer,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${entry.value.length} سورة',
+                    style: TextStyle(
+                      fontFamily: AppConstants.fontCairo,
+                      fontSize: 12,
+                      color: color.onPrimaryContainer.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // قائمة السور
+            ...entry.value.map((audio) => _DownloadedAudioTile(
+                  audio: audio,
+                  color: color,
+                  onDelete: () => onDeleteDownloaded(audio.reciterId, audio.surahId),
+                )),
+          ],
+        ),
+      );
+    }).toList();
+  }
+}
+
+// ═══════════════════════════════════════
+//  بطاقة التحميل الأساسي
 // ═══════════════════════════════════════
 class _DownloadCard extends StatelessWidget {
   final IconData icon;
@@ -749,79 +901,81 @@ class _DownloadCard extends StatelessWidget {
     return Card(
       elevation: 0,
       color: color.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isDownloaded 
-                    ? color.primaryContainer 
-                    : color.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: isDownloaded ? null : onDownload,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isDownloaded ? color.primaryContainer : color.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  icon,
+                  color: isDownloaded ? color.primary : color.onSurfaceVariant,
+                  size: 24,
+                ),
               ),
-              child: Icon(
-                icon,
-                color: isDownloaded ? color.primary : color.onSurfaceVariant,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: color.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        isDownloaded ? Icons.check_circle : Icons.cloud_outlined,
-                        size: 14,
-                        color: isDownloaded ? color.primary : color.onSurfaceVariant,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontFamily: AppConstants.fontCairo,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: color.onSurface,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontFamily: AppConstants.fontCairo,
-                          fontSize: 13,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          isDownloaded ? Icons.check_circle : Icons.cloud_outlined,
+                          size: 14,
                           color: isDownloaded ? color.primary : color.onSurfaceVariant,
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (isDownloaded)
-              Icon(Icons.check, color: color.primary, size: 28)
-            else if (isLoading)
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: color.primary,
+                        const SizedBox(width: 6),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontFamily: AppConstants.fontCairo,
+                            fontSize: 13,
+                            color: isDownloaded ? color.primary : color.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              )
-            else
-              IconButton(
-                onPressed: onDownload,
-                icon: Icon(Icons.download_outlined, color: color.primary),
               ),
-          ],
+              if (isDownloaded)
+                Icon(Icons.check, color: color.primary, size: 24)
+              else if (isLoading)
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: color.primary,
+                  ),
+                )
+              else
+                IconButton(
+                  onPressed: onDownload,
+                  icon: Icon(Icons.download_outlined, color: color.primary),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -829,225 +983,63 @@ class _DownloadCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════
-//  قسم الصوتيات
+//  زر التحديد
 // ═══════════════════════════════════════
-class _AudioSectionCard extends StatelessWidget {
+class _SelectionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
   final ColorScheme color;
-  final String filter;
-  final ValueChanged<String> onFilterChanged;
-  // القراء
-  final List<Map<String, dynamic>> reciters;
-  final bool isLoadingReciters;
-  final String? selectedReciterId;
-  final String? selectedReciterName;
-  final Function(String, String) onReciterSelected;
-  final VoidCallback onClearReciter;
-  final TextEditingController reciterSearchController;
-  final ValueChanged<String> onReciterSearchChanged;
-  // السور
-  final List<Map<String, dynamic>> surahs;
-  final bool isLoadingSurahs;
-  final String? selectedSurahId;
-  final String? selectedSurahName;
-  final Function(String, String) onSurahSelected;
-  final VoidCallback onClearSurah;
-  final TextEditingController surahSearchController;
-  final ValueChanged<String> onSurahSearchChanged;
-  // الأزرار
-  final VoidCallback onDownload;
-  // التحميلات
-  final Map<String, DownloadInfo> audioDownloads;
-  final String? activeDownloadKey;
-  final Function(String) onShowDetails;
-  final Function(String) onCancel;
+  final Color backgroundColor;
+  final Color textColor;
 
-  const _AudioSectionCard({
+  const _SelectionButton({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    required this.onClear,
     required this.color,
-    required this.filter,
-    required this.onFilterChanged,
-    required this.reciters,
-    required this.isLoadingReciters,
-    required this.selectedReciterId,
-    required this.selectedReciterName,
-    required this.onReciterSelected,
-    required this.onClearReciter,
-    required this.reciterSearchController,
-    required this.onReciterSearchChanged,
-    required this.surahs,
-    required this.isLoadingSurahs,
-    required this.selectedSurahId,
-    required this.selectedSurahName,
-    required this.onSurahSelected,
-    required this.onClearSurah,
-    required this.surahSearchController,
-    required this.onSurahSearchChanged,
-    required this.onDownload,
-    required this.audioDownloads,
-    required this.activeDownloadKey,
-    required this.onShowDetails,
-    required this.onCancel,
+    required this.backgroundColor,
+    required this.textColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: color.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? backgroundColor : color.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
           children: [
-            // العنوان
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: color.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.headphones_outlined, color: color.primary, size: 20),
+            Icon(icon,
+                size: 20,
+                color: isSelected ? textColor : color.onSurfaceVariant),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontFamily: AppConstants.fontCairo,
+                  color: isSelected ? textColor : color.onSurfaceVariant,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  'الصوتيات',
-                  style: TextStyle(
-                    fontFamily: AppConstants.fontCairo,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: color.onSurface,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            // فلتر الكل / المحملة فقط
-            Row(
-              children: [
-                _FilterChip(
-                  label: 'الكل',
-                  isSelected: filter == 'الكل',
-                  onTap: () => onFilterChanged('الكل'),
-                  color: color,
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'المحملة فقط',
-                  isSelected: filter == 'المحملة',
-                  onTap: () => onFilterChanged('المحملة'),
-                  color: color,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            // ═══ قسم القراء ═══
-            Text(
-              'اختر القارئ',
-              style: TextStyle(
-                fontFamily: AppConstants.fontCairo,
-                fontSize: 13,
-                color: color.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 8),
-            
-            if (selectedReciterName != null)
-              _SelectedItem(
-                icon: Icons.person,
-                label: selectedReciterName!,
-                backgroundColor: color.primaryContainer,
-                textColor: color.onPrimaryContainer,
-                onClear: onClearReciter,
+            if (isSelected && onClear != null)
+              GestureDetector(
+                onTap: onClear,
+                child: Icon(Icons.close, size: 18, color: textColor),
               )
-            else if (isLoadingReciters)
-              _LoadingIndicator()
             else
-              _DropdownList(
-                items: reciters,
-                searchController: reciterSearchController,
-                onSearchChanged: onReciterSearchChanged,
-                onItemSelected: (item) => onReciterSelected(
-                  item['reciter_id'].toString(),
-                  item['reciter_name'].toString(),
-                ),
-                itemBuilder: (item) => item['reciter_name'].toString(),
-                color: color,
-              ),
-            
-            const SizedBox(height: 16),
-            
-            // ═══ قسم السور ═══
-            Text(
-              'اختر السورة',
-              style: TextStyle(
-                fontFamily: AppConstants.fontCairo,
-                fontSize: 13,
-                color: color.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            
-            if (selectedSurahName != null)
-              _SelectedItem(
-                icon: Icons.menu_book,
-                label: selectedSurahName!,
-                backgroundColor: color.secondaryContainer,
-                textColor: color.onSecondaryContainer,
-                onClear: onClearSurah,
-              )
-            else if (isLoadingSurahs)
-              _LoadingIndicator()
-            else
-              _DropdownList(
-                items: surahs,
-                searchController: surahSearchController,
-                onSearchChanged: onSurahSearchChanged,
-                onItemSelected: (item) => onSurahSelected(
-                  item['number'].toString(),
-                  item['name'].toString(),
-                ),
-                itemBuilder: (item) => '${item['number']}. ${item['name']}',
-                color: color,
-              ),
-            
-            const SizedBox(height: 16),
-            
-            // ═══ زر التحميل ═══
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: selectedReciterId != null && selectedSurahId != null
-                    ? onDownload
-                    : null,
-                icon: Icon(Icons.download, size: 20),
-                label: Text(
-                  'تحميل',
-                  style: TextStyle(fontFamily: AppConstants.fontCairo),
-                ),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
-            
-            // ═══ التحميلات النشطة ═══
-            if (activeDownloadKey != null && audioDownloads.containsKey(activeDownloadKey)) ...[
-              const SizedBox(height: 16),
-              _ActiveDownloadCard(
-                info: audioDownloads[activeDownloadKey]!,
-                color: color,
-                onShowDetails: () => onShowDetails(activeDownloadKey!),
-                onCancel: () => onCancel(activeDownloadKey!),
-              ),
-            ],
+              Icon(Icons.expand_more, size: 20, color: color.onSurfaceVariant),
           ],
         ),
       ),
@@ -1061,164 +1053,242 @@ class _AudioSectionCard extends StatelessWidget {
 class _ActiveDownloadCard extends StatelessWidget {
   final DownloadInfo info;
   final ColorScheme color;
-  final VoidCallback onShowDetails;
   final VoidCallback onCancel;
+  final VoidCallback onRemove;
 
   const _ActiveDownloadCard({
     required this.info,
     required this.color,
-    required this.onShowDetails,
     required this.onCancel,
+    required this.onRemove,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.surfaceContainerHighest,
+    final isCompleted = info.isCompleted;
+    final isFailed = info.isFailed;
+
+    return Card(
+      elevation: 0,
+      color: color.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: info.isCompleted 
-              ? Colors.green.withValues(alpha: 0.5) 
-              : color.primary.withValues(alpha: 0.3),
+        side: BorderSide(
+          color: isCompleted
+              ? Colors.green.withValues(alpha: 0.5)
+              : isFailed
+                  ? color.error.withValues(alpha: 0.5)
+                  : color.primary.withValues(alpha: 0.3),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                info.isCompleted ? Icons.check_circle : Icons.downloading,
-                color: info.isCompleted ? Colors.green : color.primary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  info.isCompleted ? 'تم التحميل' : 'جاري التحميل',
-                  style: TextStyle(
-                    fontFamily: AppConstants.fontCairo,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: info.isCompleted ? Colors.green : color.onSurface,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // العنوان
+            Row(
+              children: [
+                Icon(
+                  isCompleted
+                      ? Icons.check_circle
+                      : isFailed
+                          ? Icons.error_outline
+                          : Icons.downloading,
+                  color: isCompleted
+                      ? Colors.green
+                      : isFailed
+                          ? color.error
+                          : color.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        info.surahName ?? '',
+                        style: TextStyle(
+                          fontFamily: AppConstants.fontCairo,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: color.onSurface,
+                        ),
+                      ),
+                      if (info.reciterName != null)
+                        Text(
+                          info.reciterName!,
+                          style: TextStyle(
+                            fontFamily: AppConstants.fontCairo,
+                            fontSize: 12,
+                            color: color.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (info.isDownloading)
+                  IconButton(
+                    icon: Icon(Icons.close, size: 18, color: color.error),
+                    onPressed: onCancel,
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                  )
+                else
+                  IconButton(
+                    icon: Icon(Icons.delete_outline, size: 18, color: color.error),
+                    onPressed: onRemove,
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // شريط التقدم
+            if (!isFailed) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: info.progress,
+                  minHeight: 6,
+                  backgroundColor: color.surfaceContainerLow,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isCompleted ? Colors.green : color.primary,
                   ),
                 ),
               ),
-              if (!info.isCompleted)
-                IconButton(
-                  icon: Icon(Icons.close, size: 18, color: color.error),
-                  onPressed: onCancel,
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          
-          // شريط التقدم
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: info.progress,
-              minHeight: 6,
-              backgroundColor: color.surfaceContainerLow,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                info.isCompleted ? Colors.green : color.primary,
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isCompleted
+                        ? 'تم التحميل'
+                        : isFailed
+                            ? info.error ?? 'فشل'
+                            : '${(info.progress * 100).toInt()}%',
+                    style: TextStyle(
+                      fontFamily: AppConstants.fontCairo,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isCompleted
+                          ? Colors.green
+                          : isFailed
+                              ? color.error
+                              : color.primary,
+                    ),
+                  ),
+                  if (info.speed.isNotEmpty && !isCompleted && !isFailed)
+                    Text(
+                      info.speed,
+                      style: TextStyle(
+                        fontFamily: AppConstants.fontCairo,
+                        fontSize: 11,
+                        color: color.onSurfaceVariant,
+                      ),
+                    ),
+                ],
               ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          
-          // النسبة
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${(info.progress * 100).toInt()}%',
-                style: TextStyle(
-                  fontFamily: AppConstants.fontCairo,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: info.isCompleted ? Colors.green : color.primary,
-                ),
-              ),
-              if (info.speed.isNotEmpty)
+              if (!isCompleted && !isFailed && info.downloadedSize.isNotEmpty) ...[
+                const SizedBox(height: 4),
                 Text(
-                  info.speed,
+                  '${info.downloadedSize} / ${info.fileSize} MB',
                   style: TextStyle(
                     fontFamily: AppConstants.fontCairo,
                     fontSize: 11,
                     color: color.onSurfaceVariant,
                   ),
                 ),
-            ],
-          ),
-          
-          const SizedBox(height: 8),
-          
-          // زر التفاصيل
-          if (info.isDownloading)
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: onShowDetails,
-                child: Text(
-                  'عرض التفاصيل',
-                  style: TextStyle(fontFamily: AppConstants.fontCairo, fontSize: 12),
+              ],
+            ] else ...[
+              Text(
+                info.error ?? 'حدث خطأ',
+                style: TextStyle(
+                  fontFamily: AppConstants.fontCairo,
+                  fontSize: 12,
+                  color: color.error,
                 ),
               ),
-            ),
-        ],
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
 // ═══════════════════════════════════════
-//  عنصر محدد
+//  صوتي محمل (عنصر)
 // ═══════════════════════════════════════
-class _SelectedItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color backgroundColor;
-  final Color textColor;
-  final VoidCallback onClear;
+class _DownloadedAudioTile extends StatelessWidget {
+  final DownloadedAudio audio;
+  final ColorScheme color;
+  final VoidCallback onDelete;
 
-  const _SelectedItem({
-    required this.icon,
-    required this.label,
-    required this.backgroundColor,
-    required this.textColor,
-    required this.onClear,
+  const _DownloadedAudioTile({
+    required this.audio,
+    required this.color,
+    required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(10),
+        border: Border(
+          bottom: BorderSide(
+            color: color.outlineVariant.withValues(alpha: 0.2),
+          ),
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: textColor),
-          const SizedBox(width: 8),
+          Icon(Icons.check_circle, size: 18, color: Colors.green),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              label,
+              audio.surahName,
               style: TextStyle(
                 fontFamily: AppConstants.fontCairo,
-                color: textColor,
-                fontWeight: FontWeight.bold,
+                color: color.onSurface,
               ),
             ),
           ),
           IconButton(
-            icon: Icon(Icons.close, size: 18, color: textColor),
-            onPressed: onClear,
+            icon: Icon(Icons.delete_outline, size: 18, color: color.error),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(
+                    'حذف الصوتي',
+                    style: TextStyle(fontFamily: AppConstants.fontCairo),
+                  ),
+                  content: Text(
+                    'هل تريد حذف "${audio.surahName}"؟',
+                    style: TextStyle(fontFamily: AppConstants.fontCairo),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text('إلغاء',
+                          style: TextStyle(fontFamily: AppConstants.fontCairo)),
+                    ),
+                    FilledButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        onDelete();
+                      },
+                      child: Text('حذف',
+                          style: TextStyle(fontFamily: AppConstants.fontCairo)),
+                    ),
+                  ],
+                ),
+              );
+            },
             constraints: const BoxConstraints(),
             padding: EdgeInsets.zero,
           ),
@@ -1229,229 +1299,35 @@ class _SelectedItem extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════
-//  مؤشر التحميل
+//  عنوان قسم
 // ═══════════════════════════════════════
-class _LoadingIndicator extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: color.primary,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'جاري التحميل...',
-            style: TextStyle(
-              fontFamily: AppConstants.fontCairo,
-              fontSize: 13,
-              color: color.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════
-//  قائمة منسدلة مع بحث
-// ═══════════════════════════════════════
-class _DropdownList extends StatefulWidget {
-  final List<Map<String, dynamic>> items;
-  final TextEditingController searchController;
-  final ValueChanged<String> onSearchChanged;
-  final Function(Map<String, dynamic>) onItemSelected;
-  final String Function(Map<String, dynamic>) itemBuilder;
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final IconData icon;
   final ColorScheme color;
 
-  const _DropdownList({
-    required this.items,
-    required this.searchController,
-    required this.onSearchChanged,
-    required this.onItemSelected,
-    required this.itemBuilder,
+  const _SectionTitle({
+    required this.title,
+    required this.icon,
     required this.color,
   });
 
   @override
-  State<_DropdownList> createState() => _DropdownListState();
-}
-
-class _DropdownListState extends State<_DropdownList> {
-  final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
-  bool _isExpanded = false;
-
-  @override
-  void dispose() {
-    _removeOverlay();
-    super.dispose();
-  }
-
-  void _removeOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-    if (_isExpanded) {
-      setState(() => _isExpanded = false);
-    }
-  }
-
-  void _showOverlay() {
-    if (_overlayEntry != null) return;
-    
-    _overlayEntry = OverlayEntry(
-      builder: (context) => _DropdownOverlay(
-        layerLink: _layerLink,
-        items: widget.items,
-        onItemSelected: (item) {
-          widget.onItemSelected(item);
-          _removeOverlay();
-        },
-        itemBuilder: widget.itemBuilder,
-        color: widget.color,
-        searchController: widget.searchController,
-        onSearchChanged: widget.onSearchChanged,
-        onClose: _removeOverlay,
-      ),
-    );
-    
-    Overlay.of(context).insert(_overlayEntry!);
-    setState(() => _isExpanded = true);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: GestureDetector(
-        onTap: _isExpanded ? _removeOverlay : _showOverlay,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: widget.color.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.search, color: widget.color.onSurfaceVariant, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: widget.searchController,
-                  style: TextStyle(
-                    fontFamily: AppConstants.fontCairo,
-                    color: widget.color.onSurface,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'ابحث...',
-                    hintStyle: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      color: widget.color.onSurfaceVariant,
-                    ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  onChanged: (value) {
-                    widget.onSearchChanged(value);
-                    if (!_isExpanded) {
-                      _showOverlay();
-                    } else {
-                      _overlayEntry?.markNeedsBuild();
-                    }
-                  },
-                  onTap: () {
-                    if (!_isExpanded) _showOverlay();
-                  },
-                ),
-              ),
-              Icon(
-                _isExpanded ? Icons.expand_less : Icons.expand_more,
-                color: widget.color.onSurfaceVariant,
-                size: 20,
-              ),
-            ],
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Text(
+          title,
+          style: TextStyle(
+            fontFamily: AppConstants.fontCairo,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: color.onSurfaceVariant,
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════
-//  Overlay للقائمة المنسدلة
-// ═══════════════════════════════════════
-class _DropdownOverlay extends StatelessWidget {
-  final LayerLink layerLink;
-  final List<Map<String, dynamic>> items;
-  final Function(Map<String, dynamic>) onItemSelected;
-  final String Function(Map<String, dynamic>) itemBuilder;
-  final ColorScheme color;
-  final TextEditingController searchController;
-  final ValueChanged<String> onSearchChanged;
-  final VoidCallback onClose;
-
-  const _DropdownOverlay({
-    required this.layerLink,
-    required this.items,
-    required this.onItemSelected,
-    required this.itemBuilder,
-    required this.color,
-    required this.searchController,
-    required this.onSearchChanged,
-    required this.onClose,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      width: MediaQuery.of(context).size.width - 64,
-      child: CompositedTransformFollower(
-        link: layerLink,
-        offset: const Offset(0, 50),
-        child: Material(
-          elevation: 8,
-          borderRadius: BorderRadius.circular(12),
-          color: color.surfaceContainerHighest,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 250),
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              shrinkWrap: true,
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return ListTile(
-                  dense: true,
-                  title: Text(
-                    itemBuilder(item),
-                    style: TextStyle(
-                      fontFamily: AppConstants.fontCairo,
-                      fontSize: 14,
-                      color: color.onSurface,
-                    ),
-                  ),
-                  onTap: () => onItemSelected(item),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
+      ],
     );
   }
 }
@@ -1497,151 +1373,317 @@ class _FilterChip extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════
-//  إحصائيات التحميل
+//  منتقي القراء
 // ═══════════════════════════════════════
-class _GlobalProgressCard extends StatelessWidget {
-  final ColorScheme color;
-  final bool isAzkarDownloaded;
-  final bool isLaylatDownloaded;
-  final int downloadedAudiosCount;
-  
-  const _GlobalProgressCard({
-    required this.color,
-    required this.isAzkarDownloaded,
-    required this.isLaylatDownloaded,
-    required this.downloadedAudiosCount,
+class _ReciterSelector extends StatefulWidget {
+  final List<Map<String, dynamic>> reciters;
+  final bool isLoading;
+  final Function(String, String) onSelect;
+
+  const _ReciterSelector({
+    required this.reciters,
+    required this.isLoading,
+    required this.onSelect,
   });
 
   @override
+  State<_ReciterSelector> createState() => _ReciterSelectorState();
+}
+
+class _ReciterSelectorState extends State<_ReciterSelector> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _filteredReciters = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredReciters = List.from(widget.reciters);
+  }
+
+  void _filter(String query) {
+    if (query.isEmpty) {
+      setState(() => _filteredReciters = List.from(widget.reciters));
+    } else {
+      setState(() {
+        _filteredReciters = widget.reciters
+            .where((r) => r['reciter_name'].toString().contains(query))
+            .toList();
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final completed = (isAzkarDownloaded ? 1 : 0) + (isLaylatDownloaded ? 1 : 0);
-    final total = 3;
-    final progress = completed / total;
-    
-    return Card(
-      elevation: 0,
-      color: color.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    final color = Theme.of(context).colorScheme;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: color.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // المقبض
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: color.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // العنوان
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                Icon(Icons.cloud_done_outlined, color: color.primary, size: 22),
-                const SizedBox(width: 10),
                 Text(
-                  'إحصائيات التحميل',
+                  'اختر القارئ',
                   style: TextStyle(
                     fontFamily: AppConstants.fontCairo,
-                    fontSize: 15,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: color.onSurface,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            
-            // شريط التقدم العام
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor: color.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(color.primary),
+          ),
+          // البحث
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filter,
+              style: TextStyle(fontFamily: AppConstants.fontCairo),
+              decoration: InputDecoration(
+                hintText: 'ابحث عن قارئ...',
+                hintStyle: TextStyle(fontFamily: AppConstants.fontCairo),
+                prefixIcon: Icon(Icons.search, color: color.onSurfaceVariant),
+                filled: true,
+                fillColor: color.surfaceContainerHighest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '$completed / $total مكتمل',
-              style: TextStyle(
-                fontFamily: AppConstants.fontCairo,
-                fontSize: 13,
-                color: color.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            Row(
-              children: [
-                _StatItem(
-                  icon: Icons.auto_awesome_outlined,
-                  label: 'الأذكار',
-                  value: isAzkarDownloaded ? '✓' : '-',
-                  color: color,
-                ),
-                const SizedBox(width: 12),
-                _StatItem(
-                  icon: Icons.nights_stay_outlined,
-                  label: 'ليلة القدر',
-                  value: isLaylatDownloaded ? '✓' : '-',
-                  color: color,
-                ),
-                const SizedBox(width: 12),
-                _StatItem(
-                  icon: Icons.headphones_outlined,
-                  label: 'الصوتيات',
-                  value: downloadedAudiosCount > 0 ? '$downloadedAudiosCount' : '-',
-                  color: color,
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          // القائمة
+          Expanded(
+            child: widget.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredReciters.isEmpty
+                    ? Center(
+                        child: Text(
+                          'لا توجد نتائج',
+                          style: TextStyle(
+                            fontFamily: AppConstants.fontCairo,
+                            color: color.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        itemCount: _filteredReciters.length,
+                        itemBuilder: (context, index) {
+                          final reciter = _filteredReciters[index];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: color.primaryContainer,
+                              child: Icon(Icons.person, color: color.onPrimaryContainer),
+                            ),
+                            title: Text(
+                              reciter['reciter_name'].toString(),
+                              style: TextStyle(
+                                fontFamily: AppConstants.fontCairo,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              reciter['reciter_english_name']?.toString() ?? '',
+                              style: TextStyle(
+                                fontFamily: AppConstants.fontCairo,
+                                fontSize: 12,
+                                color: color.onSurfaceVariant,
+                              ),
+                            ),
+                            onTap: () => widget.onSelect(
+                              reciter['reciter_id'].toString(),
+                              reciter['reciter_name'].toString(),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _StatItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final ColorScheme color;
+// ═══════════════════════════════════════
+//  منتقي السور
+// ═══════════════════════════════════════
+class _SurahSelector extends StatefulWidget {
+  final List<Map<String, dynamic>> surahs;
+  final bool isLoading;
+  final Function(String, String) onSelect;
 
-  const _StatItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
+  const _SurahSelector({
+    required this.surahs,
+    required this.isLoading,
+    required this.onSelect,
   });
 
   @override
+  State<_SurahSelector> createState() => _SurahSelectorState();
+}
+
+class _SurahSelectorState extends State<_SurahSelector> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _filteredSurahs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredSurahs = List.from(widget.surahs);
+  }
+
+  void _filter(String query) {
+    if (query.isEmpty) {
+      setState(() => _filteredSurahs = List.from(widget.surahs));
+    } else {
+      setState(() {
+        _filteredSurahs = widget.surahs
+            .where((s) =>
+                s['name'].toString().contains(query) ||
+                s['number'].toString().contains(query))
+            .toList();
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color.primary, size: 22),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: AppConstants.fontCairo,
-                fontSize: 11,
-                color: color.onSurfaceVariant,
+    final color = Theme.of(context).colorScheme;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: color.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // المقبض
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: color.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // العنوان
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Text(
+                  'اختر السورة',
+                  style: TextStyle(
+                    fontFamily: AppConstants.fontCairo,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // البحث
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filter,
+              style: TextStyle(fontFamily: AppConstants.fontCairo),
+              decoration: InputDecoration(
+                hintText: 'ابحث عن سورة...',
+                hintStyle: TextStyle(fontFamily: AppConstants.fontCairo),
+                prefixIcon: Icon(Icons.search, color: color.onSurfaceVariant),
+                filled: true,
+                fillColor: color.surfaceContainerHighest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontFamily: AppConstants.fontCairo,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: value == '✓' ? color.primary : color.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          // القائمة
+          Expanded(
+            child: widget.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredSurahs.isEmpty
+                    ? Center(
+                        child: Text(
+                          'لا توجد نتائج',
+                          style: TextStyle(
+                            fontFamily: AppConstants.fontCairo,
+                            color: color.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        itemCount: _filteredSurahs.length,
+                        itemBuilder: (context, index) {
+                          final surah = _filteredSurahs[index];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: color.secondaryContainer,
+                              radius: 16,
+                              child: Text(
+                                surah['number'].toString(),
+                                style: TextStyle(
+                                  fontFamily: AppConstants.fontCairo,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: color.onSecondaryContainer,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              surah['name'].toString(),
+                              style: TextStyle(
+                                fontFamily: AppConstants.fontCairo,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              surah['englishName']?.toString() ?? '',
+                              style: TextStyle(
+                                fontFamily: AppConstants.fontCairo,
+                                fontSize: 12,
+                                color: color.onSurfaceVariant,
+                              ),
+                            ),
+                            onTap: () => widget.onSelect(
+                              surah['number'].toString(),
+                              surah['name'].toString(),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }
