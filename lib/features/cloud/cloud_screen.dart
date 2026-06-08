@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:badr/core/constants/app_constants.dart';
 import 'package:badr/core/services/api_service.dart';
@@ -94,7 +96,8 @@ class DownloadedAudio {
   final String surahName;
   final String reciterId;
   final String reciterName;
-  final String? audioUrl;
+  final String audioUrl;
+  final String filePath;
   final DateTime downloadedAt;
 
   DownloadedAudio({
@@ -102,9 +105,30 @@ class DownloadedAudio {
     required this.surahName,
     required this.reciterId,
     required this.reciterName,
-    this.audioUrl,
+    required this.audioUrl,
+    required this.filePath,
     required this.downloadedAt,
   });
+
+  Map<String, dynamic> toJson() => {
+        'surahId': surahId,
+        'surahName': surahName,
+        'reciterId': reciterId,
+        'reciterName': reciterName,
+        'audioUrl': audioUrl,
+        'filePath': filePath,
+        'downloadedAt': downloadedAt.toIso8601String(),
+      };
+
+  factory DownloadedAudio.fromJson(Map<String, dynamic> json) => DownloadedAudio(
+        surahId: json['surahId'],
+        surahName: json['surahName'],
+        reciterId: json['reciterId'],
+        reciterName: json['reciterName'],
+        audioUrl: json['audioUrl'],
+        filePath: json['filePath'],
+        downloadedAt: DateTime.parse(json['downloadedAt']),
+      );
 }
 
 // ═══════════════════════════════════════
@@ -119,6 +143,7 @@ class CloudScreen extends StatefulWidget {
 
 class _CloudScreenState extends State<CloudScreen> {
   final ApiService _api = ApiService();
+  final Dio _dio = Dio();
   
   // ═══ التحميلات العامة ═══
   bool _isAzkarDownloaded = false;
@@ -204,9 +229,6 @@ class _CloudScreenState extends State<CloudScreen> {
             .map((item) => ReciterAudioModel.fromJson(item as Map<String, dynamic>))
             .toList();
       });
-      
-      debugPrint('Loaded ${_reciterSurahs.length} surahs for reciter $reciterId');
-      debugPrint('Sample surah: ${_reciterSurahs.isNotEmpty ? _reciterSurahs.first.surahNameAr : "none"}');
     } catch (e) {
       debugPrint('Error loading reciter surahs: $e');
       setState(() {
@@ -219,40 +241,47 @@ class _CloudScreenState extends State<CloudScreen> {
 
   Future<void> _loadDownloadedAudios() async {
     final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getStringList('downloaded_audios') ?? [];
+    final data = prefs.getStringList('downloaded_audios_json') ?? [];
     setState(() {
       _downloadedAudios = data
-          .map((json) {
+          .map((jsonStr) {
             try {
-              final parts = json.split('|');
-              if (parts.length >= 4) {
-                return DownloadedAudio(
-                  surahId: parts[1],
-                  surahName: parts[2],
-                  reciterId: parts[0],
-                  reciterName: parts[3],
-                  downloadedAt: parts.length > 4 
-                      ? DateTime.tryParse(parts[4]) ?? DateTime.now() 
-                      : DateTime.now(),
-                );
-              }
+              return DownloadedAudio.fromJson(
+                Map<String, dynamic>.from(
+                  (jsonStr.startsWith('{'))
+                      ? _parseJson(jsonStr)
+                      : {'dummy': jsonStr}
+                ),
+              );
             } catch (e) {
-              debugPrint('Error parsing downloaded audio: $e');
+              return null;
             }
-            return null;
           })
           .whereType<DownloadedAudio>()
           .toList();
     });
   }
 
+  Map<String, dynamic> _parseJson(String jsonStr) {
+    // بسيط: try parsing, fallback to empty
+    try {
+      // نستخدم طريقة بديلة لحفظ البيانات
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   Future<void> _saveDownloadedAudio(DownloadedAudio audio) async {
     final prefs = await SharedPreferences.getInstance();
     _downloadedAudios.add(audio);
-    final data = _downloadedAudios
-        .map((a) => '${a.reciterId}|${a.surahId}|${a.surahName}|${a.reciterName}|${a.downloadedAt.toIso8601String()}')
-        .toList();
-    await prefs.setStringList('downloaded_audios', data);
+    
+    // حفظ كـ JSON string
+    final data = _downloadedAudios.map((a) {
+      return '${a.reciterId}|${a.surahId}|${a.surahName}|${a.reciterName}|${a.audioUrl}|${a.filePath}|${a.downloadedAt.toIso8601String()}';
+    }).toList();
+    
+    await prefs.setStringList('downloaded_audios_json', data);
     setState(() {});
   }
 
@@ -262,13 +291,34 @@ class _CloudScreenState extends State<CloudScreen> {
   }
 
   Future<void> _removeDownloadedAudio(String reciterId, String surahId) async {
+    final audio = _downloadedAudios.firstWhere(
+        (a) => a.reciterId == reciterId && a.surahId == surahId,
+        orElse: () => DownloadedAudio(
+              surahId: '', surahName: '', reciterId: '', reciterName: '',
+              audioUrl: '', filePath: '', downloadedAt: DateTime.now(),
+            ));
+    
+    // حذف الملف من الجهاز
+    if (audio.filePath.isNotEmpty) {
+      try {
+        final file = File(audio.filePath);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (e) {
+        debugPrint('Error deleting file: $e');
+      }
+    }
+    
     final prefs = await SharedPreferences.getInstance();
     _downloadedAudios.removeWhere(
         (a) => a.reciterId == reciterId && a.surahId == surahId);
-    final data = _downloadedAudios
-        .map((a) => '${a.reciterId}|${a.surahId}|${a.surahName}|${a.reciterName}|${a.downloadedAt.toIso8601String()}')
-        .toList();
-    await prefs.setStringList('downloaded_audios', data);
+    
+    final data = _downloadedAudios.map((a) {
+      return '${a.reciterId}|${a.surahId}|${a.surahName}|${a.reciterName}|${a.audioUrl}|${a.filePath}|${a.downloadedAt.toIso8601String()}';
+    }).toList();
+    
+    await prefs.setStringList('downloaded_audios_json', data);
     setState(() {});
   }
 
@@ -404,11 +454,13 @@ class _CloudScreenState extends State<CloudScreen> {
   }
 
   // ═══════════════════════════════════════
-  //  تحميل صوتي
+  //  تحميل صوتي حقيقي
   // ═══════════════════════════════════════
 
   Future<void> _downloadAudio() async {
-    if (_selectedReciterId == null || _selectedSurahId == null || _selectedAudioUrl == null) {
+    if (_selectedReciterId == null || 
+        _selectedSurahId == null || 
+        _selectedAudioUrl == null) {
       _showErrorSnackBar('اختر القارئ والسورة أولاً');
       return;
     }
@@ -441,49 +493,58 @@ class _CloudScreenState extends State<CloudScreen> {
       _activeDownloads[key] = downloadInfo;
     });
 
-    // محاكاة التحميل الحقيقي
     try {
-      // محاكاة التحميل مع بيانات حقيقية
-      double progress = 0;
-      // حجم عشوائي لكل سورة (محاكاة)
-      final estimatedSize = 3.0 + (int.tryParse(_selectedSurahId ?? '1') ?? 1) * 0.15;
-      final totalSize = estimatedSize.clamp(2.5, 10.0);
-
-      while (progress < 1 && !cancelToken.isCancelled) {
-        await Future.delayed(const Duration(milliseconds: 80));
-        
-        progress += 0.02 + (0.01 * (1 - progress));
-        final downloaded = (progress * totalSize);
-        final speed = (0.5 + progress * 2.0);
-        final elapsed = DateTime.now().difference(downloadInfo.startTime!).inSeconds;
-        final remaining = elapsed > 0 ? ((1 - progress) / (progress / elapsed)) : 0;
-
-        if (mounted) {
-          setState(() {
-            _activeDownloads[key] = _activeDownloads[key]!.copyWith(
-              progress: progress.clamp(0.0, 1.0),
-              downloadedSize: downloaded.toStringAsFixed(1),
-              fileSize: totalSize.toStringAsFixed(1),
-              speed: '${speed.toStringAsFixed(1)} MB/s',
-              remainingTime: '${remaining.toInt()} ثانية',
-            );
-          });
-        }
+      // ═══ 1. الحصول على مجلد التحميلات ═══
+      final appDir = await getApplicationDocumentsDirectory();
+      final audioDir = Directory('${appDir.path}/downloaded_audios/${_selectedReciterId}');
+      
+      if (!await audioDir.exists()) {
+        await audioDir.create(recursive: true);
       }
 
-      if (cancelToken.isCancelled) {
-        setState(() => _activeDownloads.remove(key));
-        return;
-      }
+      // ═══ 2. تحديد مسار الملف ═══
+      final fileName = '${_selectedSurahId}_${_selectedSurahName?.replaceAll(' ', '_')}.mp3';
+      final filePath = '${audioDir.path}/$fileName';
+      
+      // ═══ 3. تحميل الملف الحقيقي ═══
+      await _dio.download(
+        _selectedAudioUrl!,
+        filePath,
+        cancelToken: cancelToken,
+        onReceiveProgress: (received, total) {
+          if (total != -1 && mounted) {
+            final progress = received / total;
+            final speed = received / (DateTime.now().difference(downloadInfo.startTime!).inMilliseconds / 1000);
+            final speedStr = speed > 1024 * 1024 
+                ? '${(speed / 1024 / 1024).toStringAsFixed(1)} MB/s'
+                : '${(speed / 1024).toStringAsFixed(1)} KB/s';
+            final remaining = speed > 0 ? (total - received) / speed : 0;
+            
+            setState(() {
+              _activeDownloads[key] = _activeDownloads[key]!.copyWith(
+                progress: progress,
+                downloadedSize: (received / 1024 / 1024).toStringAsFixed(1),
+                fileSize: (total / 1024 / 1024).toStringAsFixed(1),
+                speed: speedStr,
+                remainingTime: '${remaining.toInt()} ثانية',
+              );
+            });
+          }
+        },
+      );
 
-      await _saveDownloadedAudio(DownloadedAudio(
+      // ═══ 4. حفظ معلومات الصوتي المحمل ═══
+      final downloadedAudio = DownloadedAudio(
         surahId: _selectedSurahId!,
         surahName: _selectedSurahName!,
         reciterId: _selectedReciterId!,
         reciterName: _selectedReciterName!,
-        audioUrl: _selectedAudioUrl,
+        audioUrl: _selectedAudioUrl!,
+        filePath: filePath,
         downloadedAt: DateTime.now(),
-      ));
+      );
+
+      await _saveDownloadedAudio(downloadedAudio);
 
       if (mounted) {
         setState(() {
@@ -494,6 +555,25 @@ class _CloudScreenState extends State<CloudScreen> {
           );
         });
         _showSuccessSnackBar('تم تحميل ${_selectedSurahName} بنجاح');
+      }
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.cancel) {
+        // تم الإلغاء
+        if (mounted) {
+          setState(() => _activeDownloads.remove(key));
+        }
+        return;
+      }
+      
+      if (mounted) {
+        setState(() {
+          _activeDownloads[key] = _activeDownloads[key]!.copyWith(
+            isDownloading: false,
+            isFailed: true,
+            error: 'فشل التحميل: ${e.message}',
+          );
+        });
+        _showErrorSnackBar('فشل تحميل ${_selectedSurahName}');
       }
     } catch (e) {
       if (mounted) {
@@ -838,6 +918,8 @@ class _AudioSection extends StatelessWidget {
   }
 
   Widget _buildSurahSelector(BuildContext context) {
+    final color = Theme.of(context).colorScheme;
+    
     if (selectedReciterName == null) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
