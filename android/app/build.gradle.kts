@@ -34,8 +34,8 @@ android {
 
     buildTypes {
         release {
-            // استخدام signing config للـ release
-            signingConfig = signingConfigs.getByName("release")
+            // لـلإصدار: uncomment السطر التالي وأضف key.properties
+            // signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
