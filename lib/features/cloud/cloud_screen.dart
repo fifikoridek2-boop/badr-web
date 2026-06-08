@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:badr/core/constants/app_constants.dart';
 import 'package:badr/core/services/api_service.dart';
+import 'package:badr/shared/models/reciter_model.dart';
 
 // ═══════════════════════════════════════
 //  نموذج معلومات التحميل
@@ -21,6 +22,7 @@ class DownloadInfo {
   final String? surahName;
   final String? reciterId;
   final String? reciterName;
+  final String? audioUrl;
   final CancelToken? cancelToken;
   final DateTime? startTime;
 
@@ -38,6 +40,7 @@ class DownloadInfo {
     this.surahName,
     this.reciterId,
     this.reciterName,
+    this.audioUrl,
     this.cancelToken,
     this.startTime,
   });
@@ -58,6 +61,7 @@ class DownloadInfo {
     String? surahName,
     String? reciterId,
     String? reciterName,
+    String? audioUrl,
     CancelToken? cancelToken,
     DateTime? startTime,
   }) {
@@ -75,6 +79,7 @@ class DownloadInfo {
       surahName: surahName ?? this.surahName,
       reciterId: reciterId ?? this.reciterId,
       reciterName: reciterName ?? this.reciterName,
+      audioUrl: audioUrl ?? this.audioUrl,
       cancelToken: cancelToken ?? this.cancelToken,
       startTime: startTime ?? this.startTime,
     );
@@ -100,47 +105,6 @@ class DownloadedAudio {
     this.audioUrl,
     required this.downloadedAt,
   });
-
-  Map<String, dynamic> toJson() => {
-        'surahId': surahId,
-        'surahName': surahName,
-        'reciterId': reciterId,
-        'reciterName': reciterName,
-        'audioUrl': audioUrl,
-        'downloadedAt': downloadedAt.toIso8601String(),
-      };
-
-  factory DownloadedAudio.fromJson(Map<String, dynamic> json) => DownloadedAudio(
-        surahId: json['surahId'],
-        surahName: json['surahName'],
-        reciterId: json['reciterId'],
-        reciterName: json['reciterName'],
-        audioUrl: json['audioUrl'],
-        downloadedAt: DateTime.parse(json['downloadedAt']),
-      );
-}
-
-// ═══════════════════════════════════════
-//  نموذج صوتي من API
-// ═══════════════════════════════════════
-class SurahAudioItem {
-  final String surahId;
-  final String surahName;
-  final String audioUrl;
-
-  SurahAudioItem({
-    required this.surahId,
-    required this.surahName,
-    required this.audioUrl,
-  });
-
-  factory SurahAudioItem.fromJson(Map<String, dynamic> json) {
-    return SurahAudioItem(
-      surahId: json['surah_id']?.toString() ?? '',
-      surahName: json['surah_name']?.toString() ?? json['name']?.toString() ?? '',
-      audioUrl: json['audio_url']?.toString() ?? json['url']?.toString() ?? '',
-    );
-  }
 }
 
 // ═══════════════════════════════════════
@@ -163,16 +127,17 @@ class _CloudScreenState extends State<CloudScreen> {
   bool _isLoadingLaylat = false;
   
   // ═══ القراء ═══
-  List<Map<String, dynamic>> _reciters = [];
+  List<ReciterModel> _reciters = [];
   bool _isLoadingReciters = false;
   String? _selectedReciterId;
   String? _selectedReciterName;
   
   // ═══ السور (من API للقارئ المحدد) ═══
-  List<SurahAudioItem> _reciterSurahs = [];
+  List<ReciterAudioModel> _reciterSurahs = [];
   bool _isLoadingReciterSurahs = false;
   String? _selectedSurahId;
   String? _selectedSurahName;
+  String? _selectedAudioUrl;
   
   // ═══ التحميلات النشطة ═══
   final Map<String, DownloadInfo> _activeDownloads = {};
@@ -210,7 +175,9 @@ class _CloudScreenState extends State<CloudScreen> {
       final data = await _api.getReciters();
       final reciters = (data['reciters'] as List?) ?? [];
       setState(() {
-        _reciters = reciters.cast<Map<String, dynamic>>();
+        _reciters = reciters
+            .map((r) => ReciterModel.fromJson(r as Map<String, dynamic>))
+            .toList();
       });
     } catch (e) {
       debugPrint('Error loading reciters: $e');
@@ -225,40 +192,26 @@ class _CloudScreenState extends State<CloudScreen> {
       _reciterSurahs = [];
       _selectedSurahId = null;
       _selectedSurahName = null;
+      _selectedAudioUrl = null;
     });
     
     try {
       final data = await _api.getReciterAudio(reciterId);
-      final audioList = (data['audio_urls'] as List?) ?? 
-                        (data['audio'] as List?) ?? 
-                        (data as List?) ?? 
-                        [];
+      final audioList = (data['audio_urls'] as List?) ?? [];
       
       setState(() {
         _reciterSurahs = audioList
-            .map((item) => SurahAudioItem.fromJson(item as Map<String, dynamic>))
+            .map((item) => ReciterAudioModel.fromJson(item as Map<String, dynamic>))
             .toList();
       });
       
       debugPrint('Loaded ${_reciterSurahs.length} surahs for reciter $reciterId');
+      debugPrint('Sample surah: ${_reciterSurahs.isNotEmpty ? _reciterSurahs.first.surahNameAr : "none"}');
     } catch (e) {
       debugPrint('Error loading reciter surahs: $e');
-      // محاولة بديلة
-      try {
-        final data = await _api.getSurahs();
-        final surahs = (data['surahs'] as List?) ?? [];
-        setState(() {
-          _reciterSurahs = surahs
-              .map((s) => SurahAudioItem(
-                    surahId: s['number']?.toString() ?? '',
-                    surahName: s['name']?.toString() ?? '',
-                    audioUrl: '',
-                  ))
-              .toList();
-        });
-      } catch (e2) {
-        debugPrint('Fallback also failed: $e2');
-      }
+      setState(() {
+        _reciterSurahs = [];
+      });
     } finally {
       setState(() => _isLoadingReciterSurahs = false);
     }
@@ -320,24 +273,26 @@ class _CloudScreenState extends State<CloudScreen> {
   }
 
   // ═══════════════════════════════════════
-  //  اختيار القارئ
+  //  اختيار القارئ والسورة
   // ═══════════════════════════════════════
   
-  void _onReciterSelected(String id, String name) {
+  void _onReciterSelected(ReciterModel reciter) {
     setState(() {
-      _selectedReciterId = id;
-      _selectedReciterName = name;
+      _selectedReciterId = reciter.reciterId;
+      _selectedReciterName = reciter.reciterName;
       _selectedSurahId = null;
       _selectedSurahName = null;
+      _selectedAudioUrl = null;
     });
-    _loadReciterSurahs(id);
+    _loadReciterSurahs(reciter.reciterId);
     Navigator.pop(context);
   }
 
-  void _onSurahSelected(String id, String name) {
+  void _onSurahSelected(ReciterAudioModel surah) {
     setState(() {
-      _selectedSurahId = id;
-      _selectedSurahName = name;
+      _selectedSurahId = surah.surahId;
+      _selectedSurahName = surah.surahNameAr;
+      _selectedAudioUrl = surah.audioUrl;
     });
     Navigator.pop(context);
   }
@@ -348,6 +303,7 @@ class _CloudScreenState extends State<CloudScreen> {
       _selectedReciterName = null;
       _selectedSurahId = null;
       _selectedSurahName = null;
+      _selectedAudioUrl = null;
       _reciterSurahs = [];
     });
   }
@@ -356,6 +312,7 @@ class _CloudScreenState extends State<CloudScreen> {
     setState(() {
       _selectedSurahId = null;
       _selectedSurahName = null;
+      _selectedAudioUrl = null;
     });
   }
 
@@ -451,7 +408,7 @@ class _CloudScreenState extends State<CloudScreen> {
   // ═══════════════════════════════════════
 
   Future<void> _downloadAudio() async {
-    if (_selectedReciterId == null || _selectedSurahId == null) {
+    if (_selectedReciterId == null || _selectedSurahId == null || _selectedAudioUrl == null) {
       _showErrorSnackBar('اختر القارئ والسورة أولاً');
       return;
     }
@@ -475,6 +432,7 @@ class _CloudScreenState extends State<CloudScreen> {
       surahName: _selectedSurahName,
       reciterId: _selectedReciterId,
       reciterName: _selectedReciterName,
+      audioUrl: _selectedAudioUrl,
       cancelToken: cancelToken,
       startTime: DateTime.now(),
     );
@@ -483,24 +441,27 @@ class _CloudScreenState extends State<CloudScreen> {
       _activeDownloads[key] = downloadInfo;
     });
 
-    // محاكاة التحميل
+    // محاكاة التحميل الحقيقي
     try {
+      // محاكاة التحميل مع بيانات حقيقية
       double progress = 0;
-      const totalSize = 5.2;
+      // حجم عشوائي لكل سورة (محاكاة)
+      final estimatedSize = 3.0 + (int.tryParse(_selectedSurahId ?? '1') ?? 1) * 0.15;
+      final totalSize = estimatedSize.clamp(2.5, 10.0);
 
       while (progress < 1 && !cancelToken.isCancelled) {
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 80));
         
-        progress += 0.02;
+        progress += 0.02 + (0.01 * (1 - progress));
         final downloaded = (progress * totalSize);
-        final speed = (progress * 2.5);
+        final speed = (0.5 + progress * 2.0);
         final elapsed = DateTime.now().difference(downloadInfo.startTime!).inSeconds;
         final remaining = elapsed > 0 ? ((1 - progress) / (progress / elapsed)) : 0;
 
         if (mounted) {
           setState(() {
             _activeDownloads[key] = _activeDownloads[key]!.copyWith(
-              progress: progress,
+              progress: progress.clamp(0.0, 1.0),
               downloadedSize: downloaded.toStringAsFixed(1),
               fileSize: totalSize.toStringAsFixed(1),
               speed: '${speed.toStringAsFixed(1)} MB/s',
@@ -520,6 +481,7 @@ class _CloudScreenState extends State<CloudScreen> {
         surahName: _selectedSurahName!,
         reciterId: _selectedReciterId!,
         reciterName: _selectedReciterName!,
+        audioUrl: _selectedAudioUrl,
         downloadedAt: DateTime.now(),
       ));
 
@@ -1466,9 +1428,9 @@ class _FilterChip extends StatelessWidget {
 //  منتقي القراء
 // ═══════════════════════════════════════
 class _ReciterSelector extends StatefulWidget {
-  final List<Map<String, dynamic>> reciters;
+  final List<ReciterModel> reciters;
   final bool isLoading;
-  final Function(String, String) onSelect;
+  final Function(ReciterModel) onSelect;
 
   const _ReciterSelector({
     required this.reciters,
@@ -1482,7 +1444,7 @@ class _ReciterSelector extends StatefulWidget {
 
 class _ReciterSelectorState extends State<_ReciterSelector> {
   final TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> _filteredReciters = [];
+  List<ReciterModel> _filteredReciters = [];
 
   @override
   void initState() {
@@ -1496,7 +1458,7 @@ class _ReciterSelectorState extends State<_ReciterSelector> {
     } else {
       setState(() {
         _filteredReciters = widget.reciters
-            .where((r) => r['reciter_name'].toString().contains(query))
+            .where((r) => r.reciterName.contains(query))
             .toList();
       });
     }
@@ -1583,24 +1545,21 @@ class _ReciterSelectorState extends State<_ReciterSelector> {
                               child: Icon(Icons.person, color: color.onPrimaryContainer),
                             ),
                             title: Text(
-                              reciter['reciter_name'].toString(),
+                              reciter.reciterName,
                               style: TextStyle(
                                 fontFamily: AppConstants.fontCairo,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             subtitle: Text(
-                              reciter['reciter_english_name']?.toString() ?? '',
+                              reciter.reciterShortName,
                               style: TextStyle(
                                 fontFamily: AppConstants.fontCairo,
                                 fontSize: 12,
                                 color: color.onSurfaceVariant,
                               ),
                             ),
-                            onTap: () => widget.onSelect(
-                              reciter['reciter_id'].toString(),
-                              reciter['reciter_name'].toString(),
-                            ),
+                            onTap: () => widget.onSelect(reciter),
                           );
                         },
                       ),
@@ -1615,9 +1574,9 @@ class _ReciterSelectorState extends State<_ReciterSelector> {
 //  منتقي السور
 // ═══════════════════════════════════════
 class _SurahSelector extends StatefulWidget {
-  final List<SurahAudioItem> surahs;
+  final List<ReciterAudioModel> surahs;
   final bool isLoading;
-  final Function(String, String) onSelect;
+  final Function(ReciterAudioModel) onSelect;
   final Set<String> downloadedSurahIds;
 
   const _SurahSelector({
@@ -1633,7 +1592,7 @@ class _SurahSelector extends StatefulWidget {
 
 class _SurahSelectorState extends State<_SurahSelector> {
   final TextEditingController _searchController = TextEditingController();
-  List<SurahAudioItem> _filteredSurahs = [];
+  List<ReciterAudioModel> _filteredSurahs = [];
 
   @override
   void initState() {
@@ -1648,7 +1607,7 @@ class _SurahSelectorState extends State<_SurahSelector> {
       setState(() {
         _filteredSurahs = widget.surahs
             .where((s) =>
-                s.surahName.contains(query) ||
+                s.surahNameAr.contains(query) ||
                 s.surahId.contains(query))
             .toList();
       });
@@ -1751,7 +1710,7 @@ class _SurahSelectorState extends State<_SurahSelector> {
                                     ),
                             ),
                             title: Text(
-                              surah.surahName,
+                              surah.surahNameAr,
                               style: TextStyle(
                                 fontFamily: AppConstants.fontCairo,
                                 fontWeight: FontWeight.bold,
@@ -1776,7 +1735,7 @@ class _SurahSelectorState extends State<_SurahSelector> {
                                 : null,
                             onTap: isDownloaded 
                                 ? null 
-                                : () => widget.onSelect(surah.surahId, surah.surahName),
+                                : () => widget.onSelect(surah),
                           );
                         },
                       ),
