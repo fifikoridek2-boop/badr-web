@@ -34,8 +34,8 @@ android {
 
     buildTypes {
         release {
-            // لـلإصدار: uncomment السطر التالي وأضف key.properties
-            // signingConfig = signingConfigs.getByName("release")
+            // استخدام signing config للـ release
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -46,6 +46,15 @@ android {
         debug {
             isMinifyEnabled = false
         }
+    }
+}
+
+signingConfigs {
+    create("release") {
+        storeFile = file("badr-release.p12")
+        storePassword = "badr1234"
+        keyAlias = "badr"
+        keyPassword = "badr1234"
     }
 }
 
