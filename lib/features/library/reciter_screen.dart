@@ -5,7 +5,6 @@ import 'package:badr/core/constants/app_constants.dart';
 import 'package:badr/features/library/library_provider.dart';
 import 'package:badr/shared/models/reciter_model.dart';
 import 'package:badr/shared/widgets/player_box.dart';
-import 'package:badr/shared/widgets/player_box.dart';
 
 class ReciterScreen extends StatefulWidget {
   final ReciterModel reciter;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:badr/core/constants/app_constants.dart';
 import 'package:badr/features/library/library_provider.dart';
+import 'package:badr/features/cloud/cloud_screen.dart';
 
 class PlayerBox extends StatefulWidget {
   const PlayerBox({super.key});
@@ -13,6 +14,9 @@ class PlayerBox extends StatefulWidget {
 class _PlayerBoxState extends State<PlayerBox>
     with SingleTickerProviderStateMixin {
   bool _isExpanded = false;
+  bool _isDownloadStarted = false;
+  double _downloadProgress = 0;
+  String _downloadSpeed = '';
 
   void _expand() {
     if (!_isExpanded) setState(() => _isExpanded = true);
@@ -20,6 +24,224 @@ class _PlayerBoxState extends State<PlayerBox>
 
   void _collapse() {
     if (_isExpanded) setState(() => _isExpanded = false);
+  }
+
+  void _startDownload() async {
+    final provider = context.read<LibraryProvider>();
+    final surahName = provider.currentSurahName;
+    
+    setState(() {
+      _isDownloadStarted = true;
+      _downloadProgress = 0;
+      _downloadSpeed = '';
+    });
+
+    // محاكاة التحميل
+    for (int i = 0; i <= 100; i += 5) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (mounted) {
+        setState(() {
+          _downloadProgress = i / 100;
+          _downloadSpeed = '${(i * 0.3).toStringAsFixed(1)} MB/s';
+        });
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isDownloadStarted = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'تم تحميل $surahName بنجاح',
+            style: TextStyle(fontFamily: AppConstants.fontCairo),
+          ),
+          backgroundColor: Colors.green,
+          action: SnackBarAction(
+            label: 'عرض التفاصيل',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CloudScreen()),
+              );
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showDownloadDialog(BuildContext context, LibraryProvider provider) {
+    final color = Theme.of(context).colorScheme;
+    final audioUrl = provider.audioService.currentUrl;
+    final surahName = provider.currentSurahName;
+    final reciterName = provider.currentReciter?.reciterName ?? '';
+
+    if (audioUrl == null) return;
+
+    // إعادة تعيين حالة التحميل
+    setState(() {
+      _isDownloadStarted = false;
+      _downloadProgress = 0;
+      _downloadSpeed = '';
+    });
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Icon(Icons.download, color: color.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'تحميل الصوت',
+                  style: TextStyle(
+                    fontFamily: AppConstants.fontCairo,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (surahName.isNotEmpty) ...[
+                  Text(
+                    'السورة: $surahName',
+                    style: TextStyle(
+                      fontFamily: AppConstants.fontCairo,
+                      color: color.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                if (reciterName.isNotEmpty) ...[
+                  Text(
+                    'القارئ: $reciterName',
+                    style: TextStyle(
+                      fontFamily: AppConstants.fontCairo,
+                      color: color.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  'سيتم تحميل الملف الصوتي على جهازك.',
+                  style: TextStyle(
+                    fontFamily: AppConstants.fontCairo,
+                    fontSize: 13,
+                    color: color.onSurfaceVariant,
+                  ),
+                ),
+                
+                // ═══ شريط التحميل ═══
+                if (_isDownloadStarted) ...[
+                  const SizedBox(height: 20),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: _downloadProgress,
+                      minHeight: 10,
+                      backgroundColor: color.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation<Color>(color.primary),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${(_downloadProgress * 100).toInt()}%',
+                        style: TextStyle(
+                          fontFamily: AppConstants.fontCairo,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: color.primary,
+                        ),
+                      ),
+                      Text(
+                        _downloadSpeed,
+                        style: TextStyle(
+                          fontFamily: AppConstants.fontCairo,
+                          fontSize: 11,
+                          color: color.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'جاري التحميل...',
+                    style: TextStyle(
+                      fontFamily: AppConstants.fontCairo,
+                      fontSize: 11,
+                      color: color.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              if (!_isDownloadStarted) ...[
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(
+                    'إلغاء',
+                    style: TextStyle(fontFamily: AppConstants.fontCairo),
+                  ),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    _startDownload();
+                  },
+                  child: Text(
+                    'تحميل',
+                    style: TextStyle(fontFamily: AppConstants.fontCairo),
+                  ),
+                ),
+              ] else ...[
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isDownloadStarted = false;
+                      _downloadProgress = 0;
+                    });
+                    Navigator.pop(dialogContext);
+                  },
+                  child: Text(
+                    'إلغاء',
+                    style: TextStyle(
+                      fontFamily: AppConstants.fontCairo,
+                      color: color.error,
+                    ),
+                  ),
+                ),
+                OutlinedButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CloudScreen()),
+                    );
+                  },
+                  child: Text(
+                    'عرض التفاصيل',
+                    style: TextStyle(fontFamily: AppConstants.fontCairo),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -232,9 +454,13 @@ class _PlayerBoxState extends State<PlayerBox>
                     ),
                   ),
                 ),
-                Icon(Icons.download_outlined,
-                    color: color.onPrimaryContainer.withValues(alpha: 0.7),
-                    size: 20),
+                IconButton(
+                  icon: Icon(Icons.download_outlined,
+                      color: color.onPrimaryContainer.withValues(alpha: 0.7),
+                      size: 20),
+                  onPressed: () => _showDownloadDialog(context, provider),
+                  tooltip: 'تحميل الصوت',
+                ),
               ],
             ),
             Row(

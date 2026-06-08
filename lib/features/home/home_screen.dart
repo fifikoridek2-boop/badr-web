@@ -10,6 +10,7 @@ import 'package:badr/features/tasbih/tasbih_screen.dart';
 import 'package:badr/features/radio/radio_screen.dart';
 import 'package:badr/features/settings/settings_screen.dart';
 import 'package:badr/features/laylat_al_qadr/laylat_al_qadr_screen.dart';
+import 'package:badr/features/cloud/cloud_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -54,8 +55,11 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.cloud_outlined),
-            onPressed: () {},
-            tooltip: 'السحابة',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CloudScreen()),
+            ),
+            tooltip: 'التحميلات',
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
