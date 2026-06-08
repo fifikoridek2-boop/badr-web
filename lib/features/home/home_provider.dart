@@ -9,6 +9,18 @@ class HomeProvider extends ChangeNotifier {
   bool _isLoading = false;
   String _error = '';
 
+  // أذكار افتراضية للعرض بدون إنترنت
+  static const List<String> _fallbackAzkar = [
+    'سُبْحَانَ اللهِ وَبِحَمْدِهِ، سُبْحَانَ اللهِ الْعَظِيمِ',
+    'لَا إِلَهَ إِلَّا اللهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
+    'رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي',
+    'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ',
+    'سُبْحَانَ اللهِ وَبِحَمْدِهِ، وَأَسْتَغْفِرُ اللهَ وَأَتُوبُ إِلَيْهِ',
+    'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ',
+    'بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ',
+  ];
+
   String get azkarText => _azkarText;
   bool get isLoading => _isLoading;
   String get error => _error;
@@ -34,14 +46,21 @@ class HomeProvider extends ChangeNotifier {
 
       if (allAzkar.isNotEmpty) {
         final index = DateTime.now().second % allAzkar.length;
-        _azkarText = allAzkar[index]['text']?.toString() ?? '';
+        _azkarText = allAzkar[index]['text']?.toString() ?? _getRandomFallback();
+      } else {
+        _azkarText = _getRandomFallback();
       }
     } catch (e) {
-      _error = e.toString();
-      _azkarText = 'سبحان الله وبحمده، سبحان الله العظيم';
+      _error = '';
+      _azkarText = _getRandomFallback();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  String _getRandomFallback() {
+    final index = DateTime.now().second % _fallbackAzkar.length;
+    return _fallbackAzkar[index];
   }
 }
