@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:quran_library/quran_library.dart' as qlib;
 import 'core/constants/app_constants.dart';
 import 'core/theme/theme.dart';
 import 'core/theme/theme_provider.dart';
@@ -14,6 +15,9 @@ import 'features/prayer/prayer_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // تهيئة مكتبة القرآن قبل تشغيل التطبيق
+  await qlib.QuranLibrary.init();
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
