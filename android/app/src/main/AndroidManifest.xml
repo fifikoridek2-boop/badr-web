@@ -1,9 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- ═══════════════════════════════════════ -->
-    <!--  الصلاحيات                              -->
-    <!-- ═══════════════════════════════════════ -->
-
     <!-- الشبكة والموقع -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -46,22 +42,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- just_audio: خدمة تشغيل الصوت في الخلفية -->
-        <service
-            android:name="com.ryanheise.just_audio.AudioPlayerService"
-            android:foregroundServiceType="mediaPlayback"
-            android:exported="false" />
-
-        <!-- استقبال إشعارات الإقلاع لإعادة جدولة أوقات الصلاة -->
-        <receiver
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
 
         <meta-data
             android:name="flutterEmbedding"
