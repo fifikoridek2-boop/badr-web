@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId = "com.badr.app"
-        minSdk = flutter.minSdkVersion
+        minSdk = 21          // just_audio / geolocator / permission_handler require >= 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
