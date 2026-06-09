@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId = "com.badr.app"
-        minSdk = 21          // just_audio / geolocator / permission_handler require >= 21
+        minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -29,7 +29,16 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("debug")
+        }
+        debug {
+            isMinifyEnabled = false
         }
     }
 }
