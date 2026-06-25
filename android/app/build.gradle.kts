@@ -32,6 +32,15 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("badr-release.p12")
+            storePassword = "badr1234"
+            keyAlias = "badr"
+            keyPassword = "badr1234"
+        }
+    }
+
     buildTypes {
         release {
             // استخدام signing config للـ release
@@ -46,15 +55,6 @@ android {
         debug {
             isMinifyEnabled = false
         }
-    }
-}
-
-signingConfigs {
-    create("release") {
-        storeFile = file("badr-release.p12")
-        storePassword = "badr1234"
-        keyAlias = "badr"
-        keyPassword = "badr1234"
     }
 }
 
