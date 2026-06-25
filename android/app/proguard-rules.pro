@@ -28,3 +28,7 @@
 
 # Keep data models
 -keep class com.badr.shared.models.** { *; }
+
+# Google Play Core (required by Flutter Play Store split application)
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }
